@@ -32,12 +32,6 @@ function formatLesson(text: string): React.ReactNode {
           {trimmed.replace(/^### /, "")}
         </h3>
       );
-    } else if (trimmed.startsWith("**") && trimmed.endsWith("**") && trimmed.indexOf("**", 2) === trimmed.length - 2) {
-      elements.push(
-        <p key={key++} className="text-xs text-slate-400 font-medium mb-2">
-          {trimmed.replace(/\*\*/g, "")}
-        </p>
-      );
     } else if (trimmed.startsWith("**Category:**") || trimmed.startsWith("**Difficulty:**")) {
       elements.push(
         <p key={key++} className="text-xs text-slate-400 mb-2 font-mono">
@@ -121,13 +115,13 @@ export function LearningCard() {
   }
 
   return (
-    <div className="bento-card rounded-3xl overflow-hidden flex flex-col">
+    <div className="bento-card rounded-3xl">
 
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.04]">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
-            <BookOpen className="h-4.5 w-4.5 text-violet-400" strokeWidth={1.5} />
+            <BookOpen className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -142,8 +136,7 @@ export function LearningCard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Today's Concept button */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => fetchConcept("concept")}
             disabled={isLoading}
@@ -156,7 +149,6 @@ export function LearningCard() {
             Today's Concept
           </button>
 
-          {/* Weekly Recap button */}
           <button
             onClick={() => fetchConcept("recap")}
             disabled={isLoading}
@@ -171,7 +163,7 @@ export function LearningCard() {
         </div>
       </div>
 
-      {/* Content area */}
+      {/* Empty state */}
       {!lesson && !isLoading && !error && (
         <div className="flex flex-col items-center justify-center py-12 px-6 text-center gap-3">
           <div className="w-14 h-14 rounded-2xl bg-violet-500/10 border border-violet-500/15 flex items-center justify-center mb-1">
@@ -184,6 +176,7 @@ export function LearningCard() {
         </div>
       )}
 
+      {/* Loading state */}
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <Loader2 className="h-8 w-8 text-indigo-400 animate-spin" />
@@ -194,6 +187,7 @@ export function LearningCard() {
         </div>
       )}
 
+      {/* Error */}
       {error && !isLoading && (
         <div className="mx-5 mt-4 mb-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400 flex items-center gap-2">
           <span className="text-red-400/70">⚠</span>
@@ -201,29 +195,29 @@ export function LearningCard() {
         </div>
       )}
 
+      {/* Lesson content — no overflow-hidden, grows naturally to show all sections */}
       {lesson && !isLoading && (
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <>
           {/* Collapse toggle */}
           <button
             onClick={() => setExpanded(e => !e)}
-            className="flex items-center justify-between px-5 py-2 text-[11px] text-slate-600 hover:text-slate-400 transition-colors border-b border-white/[0.03]"
+            className="w-full flex items-center justify-between px-5 py-2 text-[11px] text-slate-600 hover:text-slate-400 transition-colors border-b border-white/[0.03]"
           >
             <span className="font-mono uppercase tracking-wider">
-              {expanded ? "Collapse lesson" : "Show lesson"}
+              {expanded ? "Collapse lesson" : "Show full lesson"}
             </span>
             {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           </button>
 
           {expanded && (
-            <div className="flex-1 overflow-y-auto bento-scrollbar px-5 py-4">
-              <div className="prose-sm max-w-none">
-                {formatLesson(lesson.text)}
-              </div>
+            <div className="px-5 py-4">
+              {/* Lesson text — renders fully, no height cap */}
+              <div>{formatLesson(lesson.text)}</div>
 
               {/* Divider */}
               <div className="my-5 border-t border-white/[0.04]" />
 
-              {/* Reflection answer input */}
+              {/* Reflection answer */}
               <div className="space-y-2">
                 <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-400 inline-block" />
@@ -236,18 +230,18 @@ export function LearningCard() {
                     Answer saved to Notion — status updated to Reviewed
                   </div>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex items-end gap-2">
                     <textarea
                       rows={2}
                       value={answer}
                       onChange={e => setAnswer(e.target.value)}
                       placeholder="Answer the reflection question above in 1-2 sentences…"
-                      className="flex-1 resize-none rounded-xl bg-black/30 border border-white/[0.06] focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-700 focus:outline-none transition-all bento-scrollbar"
+                      className="flex-1 resize-none rounded-xl bg-black/30 border border-white/[0.08] focus:border-violet-500/30 focus:ring-1 focus:ring-violet-500/20 px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-700 focus:outline-none transition-all"
                     />
                     <button
                       onClick={saveAnswer}
                       disabled={!answer.trim() || isSavingAnswer}
-                      className="flex-shrink-0 w-10 self-end mb-0.5 h-10 rounded-xl bg-violet-600/80 hover:bg-violet-500 disabled:bg-white/[0.04] disabled:text-slate-700 text-white flex items-center justify-center transition-all"
+                      className="flex-shrink-0 w-10 h-10 rounded-xl bg-violet-600/80 hover:bg-violet-500 disabled:bg-white/[0.04] disabled:text-slate-600 text-white flex items-center justify-center transition-all"
                     >
                       {isSavingAnswer
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -259,13 +253,20 @@ export function LearningCard() {
               </div>
 
               {lesson.cached && (
-                <p className="text-[10px] text-slate-700 font-mono mt-3 text-center">
-                  Loaded from today's Notion entry · <button onClick={() => fetchConcept("concept")} className="text-indigo-600 hover:text-indigo-400 transition-colors"><RefreshCw className="h-2.5 w-2.5 inline mr-0.5" />Regenerate</button>
+                <p className="text-[10px] text-slate-700 font-mono mt-4 flex items-center gap-1.5">
+                  Loaded from today's Notion entry ·
+                  <button
+                    onClick={() => fetchConcept("concept")}
+                    className="text-indigo-600 hover:text-indigo-400 transition-colors flex items-center gap-1"
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                    Regenerate
+                  </button>
                 </p>
               )}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
