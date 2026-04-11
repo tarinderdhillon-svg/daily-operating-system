@@ -31,14 +31,14 @@ async function getTasksFromNotion() {
     const props = page.properties as {
       Name?: { title: Array<{ plain_text: string }> };
       "Due Date"?: { date: { start: string } | null };
-      Priority?: { multi_select: Array<{ name: string }> };
+      Priority?: { select: { name: string } | null };
       Status?: { status: { name: string } | null };
     };
     return {
       id: page.id,
       title: props?.Name?.title?.map((t: { plain_text: string }) => t.plain_text).join("") ?? "",
       due_date: props?.["Due Date"]?.date?.start ?? null,
-      priority: props?.Priority?.multi_select?.[0]?.name ?? null,
+      priority: props?.Priority?.select?.name ?? null,
       status: props?.Status?.status?.name ?? null,
     };
   });
@@ -50,7 +50,7 @@ async function createTask(title: string, due_date: string | null, priority: stri
     Status: { status: { name: "Not started" } },
   };
   if (due_date) properties["Due Date"] = { date: { start: due_date } };
-  if (priority) properties["Priority"] = { multi_select: [{ name: priority }] };
+  if (priority) properties["Priority"] = { select: { name: priority } };
 
   const page = await notionRequest("/pages", "POST", {
     parent: { database_id: NOTION_DB_ID },

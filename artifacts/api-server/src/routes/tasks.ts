@@ -19,7 +19,7 @@ interface NotionTask {
   properties: {
     Name?: { title: Array<{ plain_text: string }> };
     "Due Date"?: { date: { start: string } | null };
-    Priority?: { multi_select: Array<{ name: string }> };
+    Priority?: { select: { name: string } | null };
     Status?: { status: { name: string } | null };
   };
 }
@@ -29,7 +29,7 @@ function parseTask(page: NotionTask) {
     page.properties?.Name?.title?.map((t) => t.plain_text).join("") ?? "";
   const due_date = page.properties?.["Due Date"]?.date?.start ?? null;
   const priority =
-    (page.properties?.Priority?.multi_select?.[0]?.name as
+    (page.properties?.Priority?.select?.name as
       | "High"
       | "Medium"
       | "Low"
@@ -129,7 +129,7 @@ router.post("/", async (req, res): Promise<void> => {
     }
 
     if (priority) {
-      properties["Priority"] = { multi_select: [{ name: priority }] };
+      properties["Priority"] = { select: { name: priority } };
     }
 
     const page = await notionRequest("/pages", "POST", {
@@ -174,7 +174,7 @@ router.patch("/:taskId", async (req, res): Promise<void> => {
       properties["Status"] = { status: { name: status } };
     }
     if (priority !== undefined && priority !== null) {
-      properties["Priority"] = { multi_select: [{ name: priority }] };
+      properties["Priority"] = { select: { name: priority } };
     }
     if (due_date !== undefined && due_date !== null) {
       properties["Due Date"] = { date: { start: due_date } };
