@@ -1,11 +1,28 @@
-import React, { useState } from "react";
-import { BookOpen, Sparkles, RefreshCw, RotateCcw, Send, CheckCircle2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  BookOpen, Sparkles, RefreshCw, RotateCcw, Send, CheckCircle2,
+  ChevronDown, ChevronUp, Loader2, Volume2, Pause, Square,
+} from "lucide-react";
 
 interface LessonState {
   text: string;
   concept?: string;
   category?: string;
   cached?: boolean;
+}
+
+type AudioState = "idle" | "speaking" | "paused";
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^## (.+)$/gm, "$1.")
+    .replace(/^### \d+\.\s*(.+)$/gm, "Section: $1.")
+    .replace(/^### (.+)$/gm, "Section: $1.")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/^[-•]\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function formatLesson(text: string): React.ReactNode {
@@ -56,18 +73,67 @@ function formatLesson(text: string): React.ReactNode {
 }
 
 export function LearningCard() {
-  const [lesson, setLesson] = useState<LessonState | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingType, setLoadingType] = useState<"concept" | "recap" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [answer, setAnswer] = useState("");
-  const [answerSaved, setAnswerSaved] = useState(false);
+  const [lesson, setLesson]             = useState<LessonState | null>(null);
+  const [isLoading, setIsLoading]       = useState(false);
+  const [loadingType, setLoadingType]   = useState<"concept" | "recap" | null>(null);
+  const [error, setError]               = useState<string | null>(null);
+  const [answer, setAnswer]             = useState("");
+  const [answerSaved, setAnswerSaved]   = useState(false);
   const [isSavingAnswer, setIsSavingAnswer] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded]         = useState(true);
+  const [audioState, setAudioState]     = useState<AudioState>("idle");
+  const utteranceRef                    = useRef<SpeechSynthesisUtterance | null>(null);
 
   const baseUrl = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
 
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  function startSpeaking() {
+    if (!lesson || typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    const clean = stripMarkdown(lesson.text);
+    const utt   = new SpeechSynthesisUtterance(clean);
+    utt.rate  = 0.95;
+    utt.pitch = 1;
+    utt.lang  = "en-GB";
+
+    utt.onstart  = () => setAudioState("speaking");
+    utt.onpause  = () => setAudioState("paused");
+    utt.onresume = () => setAudioState("speaking");
+    utt.onend    = () => setAudioState("idle");
+    utt.onerror  = () => setAudioState("idle");
+
+    utteranceRef.current = utt;
+    window.speechSynthesis.speak(utt);
+    setAudioState("speaking");
+  }
+
+  function togglePause() {
+    if (!window.speechSynthesis) return;
+    if (audioState === "speaking") {
+      window.speechSynthesis.pause();
+      setAudioState("paused");
+    } else if (audioState === "paused") {
+      window.speechSynthesis.resume();
+      setAudioState("speaking");
+    }
+  }
+
+  function stopSpeaking() {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    setAudioState("idle");
+  }
+
   async function fetchConcept(type: "concept" | "recap") {
+    stopSpeaking();
     setIsLoading(true);
     setLoadingType(type);
     setError(null);
@@ -76,7 +142,7 @@ export function LearningCard() {
 
     try {
       const endpoint = type === "recap" ? "/api/learning/recap" : "/api/learning/concept";
-      const res = await fetch(`${baseUrl}${endpoint}`);
+      const res  = await fetch(`${baseUrl}${endpoint}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error ?? "Failed to load");
@@ -137,6 +203,51 @@ export function LearningCard() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Audio controls — only when a lesson is loaded */}
+          {lesson && !isLoading && (
+            <div className="flex items-center gap-1 mr-1">
+              {audioState === "idle" ? (
+                <button
+                  onClick={startSpeaking}
+                  title="Listen to lesson"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-violet-600/20 hover:bg-violet-500/30 border border-violet-500/20 text-violet-400 transition-all"
+                >
+                  <Volume2 className="h-3 w-3" />
+                  <span className="hidden sm:inline">Listen</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={togglePause}
+                    title={audioState === "speaking" ? "Pause" : "Resume"}
+                    className={`p-1.5 rounded-xl transition-all border ${
+                      audioState === "speaking"
+                        ? "bg-violet-500/20 border-violet-500/30 text-violet-300 hover:bg-violet-500/30"
+                        : "bg-amber-500/20 border-amber-500/30 text-amber-300 hover:bg-amber-500/30"
+                    }`}
+                  >
+                    {audioState === "speaking"
+                      ? <Pause className="h-3 w-3" />
+                      : <Volume2 className="h-3 w-3 animate-pulse" />
+                    }
+                  </button>
+                  <button
+                    onClick={stopSpeaking}
+                    title="Stop"
+                    className="p-1.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                  >
+                    <Square className="h-3 w-3" />
+                  </button>
+                </>
+              )}
+              {audioState !== "idle" && (
+                <span className={`text-[10px] font-mono ${audioState === "speaking" ? "text-violet-400 animate-pulse" : "text-amber-400"}`}>
+                  {audioState === "speaking" ? "Playing…" : "Paused"}
+                </span>
+              )}
+            </div>
+          )}
+
           <button
             onClick={() => fetchConcept("concept")}
             disabled={isLoading}
@@ -195,7 +306,7 @@ export function LearningCard() {
         </div>
       )}
 
-      {/* Lesson content — no overflow-hidden, grows naturally to show all sections */}
+      {/* Lesson content */}
       {lesson && !isLoading && (
         <>
           {/* Collapse toggle */}
@@ -211,10 +322,8 @@ export function LearningCard() {
 
           {expanded && (
             <div className="px-5 py-4">
-              {/* Lesson text — renders fully, no height cap */}
               <div>{formatLesson(lesson.text)}</div>
 
-              {/* Divider */}
               <div className="my-5 border-t border-white/[0.04]" />
 
               {/* Reflection answer */}

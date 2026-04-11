@@ -1,33 +1,34 @@
-import React, { useState } from "react";
-import { parseISO, format, isValid } from "date-fns";
+import React, { useState, useEffect } from "react";
+import { parseISO, format, isValid, isBefore, startOfDay } from "date-fns";
 import {
   useGetTasks, useCreateTask, useUpdateTask, useDeleteTask, getGetTasksQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Plus, Edit2, Trash2, CheckCircle2, Circle,
-  AlertTriangle, Clock, Zap, ListTodo, ChevronDown, ChevronRight, X, Check,
+  Plus, Edit2, Trash2, CheckCircle2, Circle, ChevronLeft, ChevronRight,
+  ListTodo, X, AlertTriangle, FolderOpen,
 } from "lucide-react";
 
 type Task = {
   id: string; title: string;
   due_date?: string | null; priority?: "Urgent" | "High" | "Medium" | "Low" | null;
-  status?: string | null; notes?: string | null;
+  status?: string | null; notes?: string | null; project_id?: string | null;
 };
 
-const PRIORITY_CFG: Record<string, { color: string; bg: string; border: string; dot: string }> = {
-  Urgent: { color: "#f87171", bg: "rgba(248,113,113,0.12)", border: "#f87171", dot: "#f87171" },
-  High:   { color: "#fb923c", bg: "rgba(251,146,60,0.10)",  border: "#fb923c", dot: "#fb923c" },
-  Medium: { color: "#fbbf24", bg: "rgba(251,191,36,0.10)",  border: "#fbbf24", dot: "#fbbf24" },
-  Low:    { color: "#4ade80", bg: "rgba(74,222,128,0.10)",  border: "#4ade80", dot: "#4ade80" },
-};
-const DEFAULT_CFG = { color: "#64748b", bg: "transparent", border: "#334155", dot: "#64748b" };
+type Project = { id: string; name: string };
 
-const SECTION_CFG = {
-  overdue:    { label: "Overdue",      icon: <AlertTriangle size={12} />, color: "text-red-400",   accent: "#f87171", bg: "bg-red-500/5",    border: "border-red-500/10"   },
-  outstanding:{ label: "Due Soon",     icon: <Clock size={12} />,         color: "text-amber-400", accent: "#fbbf24", bg: "bg-amber-500/5",  border: "border-amber-500/10" },
-  inProgress: { label: "In Progress",  icon: <Zap size={12} />,           color: "text-indigo-400",accent: "#818cf8", bg: "bg-indigo-500/5", border: "border-indigo-500/10"},
-  todo:       { label: "Not Started",  icon: <Circle size={12} />,        color: "text-slate-400", accent: "#94a3b8", bg: "bg-white/[0.01]", border: "border-white/[0.05]" },
+const STATUS_PIPELINE = ["Not started", "In progress", "In Review", "Done"] as const;
+type KanbanStatus = typeof STATUS_PIPELINE[number];
+
+const COLUMN_CFG: Record<KanbanStatus, { label: string; accent: string; bg: string; border: string; headerBg: string }> = {
+  "Not started": { label: "Not Started", accent: "#64748b", bg: "bg-slate-500/[0.04]",  border: "border-slate-500/10",  headerBg: "bg-slate-500/10"  },
+  "In progress": { label: "In Progress", accent: "#818cf8", bg: "bg-indigo-500/[0.04]", border: "border-indigo-500/15", headerBg: "bg-indigo-500/10" },
+  "In Review":   { label: "In Review",   accent: "#fbbf24", bg: "bg-amber-500/[0.04]",  border: "border-amber-500/15", headerBg: "bg-amber-500/10"  },
+  "Done":        { label: "Done",         accent: "#4ade80", bg: "bg-emerald-500/[0.04]",border: "border-emerald-500/15",headerBg: "bg-emerald-500/10"},
+};
+
+const PRIORITY_COLOR: Record<string, string> = {
+  Urgent: "#f87171", High: "#fb923c", Medium: "#fbbf24", Low: "#4ade80",
 };
 
 function safeDue(d: string | null | undefined) {
@@ -35,88 +36,107 @@ function safeDue(d: string | null | undefined) {
   try { const dt = parseISO(d); return isValid(dt) ? format(dt, "MMM d") : d; } catch { return d; }
 }
 
-function TaskRow({ task, onDone, onDelete, onEdit }: {
+function isOverdue(due_date: string | null | undefined) {
+  if (!due_date) return false;
+  try { return isBefore(startOfDay(parseISO(due_date)), startOfDay(new Date())); } catch { return false; }
+}
+
+function KanbanCard({
+  task, pipeline, onMove, onEdit, onDone, onDelete,
+}: {
   task: Task;
+  pipeline: KanbanStatus[];
+  onMove: (id: string, status: KanbanStatus) => void;
+  onEdit: (t: Task) => void;
   onDone: (id: string) => void;
   onDelete: (id: string) => void;
-  onEdit: (t: Task) => void;
 }) {
-  const p = PRIORITY_CFG[task.priority ?? ""] ?? DEFAULT_CFG;
-  const due = safeDue(task.due_date);
+  const due      = safeDue(task.due_date);
+  const overdue  = isOverdue(task.due_date) && task.status !== "Done";
+  const pColor   = PRIORITY_COLOR[task.priority ?? ""] ?? "#64748b";
+  const curIdx   = pipeline.indexOf((task.status ?? "Not started") as KanbanStatus);
+  const canLeft  = curIdx > 0;
+  const canRight = curIdx < pipeline.length - 1;
 
   return (
-    <div
-      className="group flex items-start gap-2.5 px-3.5 py-2.5 hover:bg-white/[0.03] transition-all cursor-default"
-      style={{ borderLeft: `2px solid ${p.border}22` }}
+    <div className={`group relative rounded-2xl border p-3 transition-all cursor-default ${
+      overdue
+        ? "border-red-500/25 bg-red-500/[0.04]"
+        : "border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04]"
+    }`}
+      style={{ borderLeftWidth: "3px", borderLeftColor: overdue ? "#f87171" : pColor + "66" }}
     >
-      <button
-        onClick={() => onDone(task.id)}
-        title="Mark as done"
-        className="flex-shrink-0 mt-0.5 rounded-full border border-slate-700 hover:border-emerald-400 hover:bg-emerald-400/10 flex items-center justify-center transition-all group/done"
-        style={{ width: "17px", height: "17px" }}
-      >
-        <Check size={9} className="text-slate-700 group-hover/done:text-emerald-400 transition-colors" />
-      </button>
+      {/* Title */}
+      <p className="text-[13px] font-medium text-slate-200 leading-snug mb-1.5">{task.title}</p>
 
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-200 font-medium leading-snug truncate">{task.title}</p>
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-          {due && <span className="text-[11px] text-slate-500 font-mono">{due}</span>}
-          {task.status && (
-            <span className="text-[11px] text-slate-600 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: p.dot + "99" }} />
-              {task.status}
-            </span>
-          )}
-          {task.priority && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ color: p.color, background: p.bg }}>
-              {task.priority}
-            </span>
-          )}
-        </div>
-        {task.notes && (
-          <p className="text-[11px] text-slate-600 mt-0.5 truncate italic">"{task.notes}"</p>
+      {/* Meta row */}
+      <div className="flex items-center flex-wrap gap-x-2 gap-y-1">
+        {overdue && (
+          <span className="flex items-center gap-0.5 text-[10px] text-red-400 font-semibold">
+            <AlertTriangle size={9} />
+            Overdue
+          </span>
+        )}
+        {due && !overdue && (
+          <span className="text-[11px] text-slate-500 font-mono">{due}</span>
+        )}
+        {due && overdue && (
+          <span className="text-[11px] text-red-500/70 font-mono line-through">{due}</span>
+        )}
+        {task.priority && (
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+            style={{ color: pColor, background: pColor + "18" }}>
+            {task.priority}
+          </span>
         )}
       </div>
 
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 flex-shrink-0 -mt-0.5">
+      {/* Notes */}
+      {task.notes && (
+        <p className="text-[11px] text-slate-600 mt-1 truncate italic">"{task.notes}"</p>
+      )}
+
+      {/* Action row — shown on hover */}
+      <div className="flex items-center gap-0.5 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Move left */}
+        <button
+          onClick={() => canLeft && onMove(task.id, pipeline[curIdx - 1])}
+          disabled={!canLeft}
+          title={canLeft ? `Move to ${pipeline[curIdx - 1]}` : undefined}
+          className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/[0.08] disabled:opacity-20 transition-colors"
+        >
+          <ChevronLeft size={12} />
+        </button>
+
+        {/* Move right */}
+        <button
+          onClick={() => canRight && onMove(task.id, pipeline[curIdx + 1])}
+          disabled={!canRight}
+          title={canRight ? `Move to ${pipeline[curIdx + 1]}` : undefined}
+          className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/[0.08] disabled:opacity-20 transition-colors"
+        >
+          <ChevronRight size={12} />
+        </button>
+
+        <div className="flex-1" />
+
+        {/* Mark done (quick) */}
+        <button onClick={() => onDone(task.id)} title="Mark done"
+          className="p-1 rounded-lg text-slate-600 hover:text-emerald-400 hover:bg-emerald-400/10 transition-colors">
+          <CheckCircle2 size={12} />
+        </button>
+
+        {/* Edit */}
         <button onClick={() => onEdit(task)} title="Edit"
-          className="p-1.5 rounded-lg hover:bg-white/8 text-slate-600 hover:text-slate-300 transition-colors">
-          <Edit2 size={11} />
+          className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/[0.08] transition-colors">
+          <Edit2 size={12} />
         </button>
+
+        {/* Delete */}
         <button onClick={() => onDelete(task.id)} title="Delete"
-          className="p-1.5 rounded-lg hover:bg-red-500/15 text-slate-700 hover:text-red-400 transition-colors">
-          <Trash2 size={11} />
+          className="p-1 rounded-lg text-slate-700 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+          <Trash2 size={12} />
         </button>
-      </div>
-    </div>
-  );
-}
-
-function Section({ sectionKey, tasks, onDone, onDelete, onEdit }: {
-  sectionKey: keyof typeof SECTION_CFG;
-  tasks: Task[];
-  onDone: (id: string) => void;
-  onDelete: (id: string) => void;
-  onEdit: (t: Task) => void;
-}) {
-  const cfg = SECTION_CFG[sectionKey];
-  if (tasks.length === 0) return null;
-
-  return (
-    <div className={`rounded-2xl overflow-hidden ${cfg.bg} border ${cfg.border}`}>
-      <div className="flex items-center gap-1.5 px-3.5 py-2 border-b border-white/[0.04]">
-        <span className={cfg.color}>{cfg.icon}</span>
-        <span className={`text-[10px] font-bold tracking-widest uppercase ${cfg.color}`}>{cfg.label}</span>
-        <span className="ml-auto text-[10px] font-bold w-4.5 h-4.5 rounded-full flex items-center justify-center"
-          style={{ background: `${cfg.accent}22`, color: cfg.accent, width: "18px", height: "18px" }}>
-          {tasks.length}
-        </span>
-      </div>
-      <div className="divide-y divide-white/[0.04]">
-        {tasks.map(t => (
-          <TaskRow key={t.id} task={t} onDone={onDone} onDelete={onDelete} onEdit={onEdit} />
-        ))}
       </div>
     </div>
   );
@@ -129,18 +149,34 @@ export function TasksCard() {
   const updateTask  = useUpdateTask();
   const deleteTask  = useDeleteTask();
 
-  const [newTitle, setNewTitle]           = useState("");
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [editingTask, setEditingTask]     = useState<Task | null>(null);
-  const [editForm, setEditForm]           = useState({ title: "", priority: "", status: "", due_date: "", notes: "" });
+  const [newTitle, setNewTitle]       = useState("");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editForm, setEditForm]       = useState({ title: "", priority: "", status: "", due_date: "", notes: "", project_id: "" });
+  const [projects, setProjects]       = useState<Project[]>([]);
+  const [showDone, setShowDone]       = useState(false);
 
+  const baseUrl = (import.meta.env.BASE_URL as string).replace(/\/$/, "");
   const inv = () => queryClient.invalidateQueries({ queryKey: getGetTasksQueryKey() });
+
+  useEffect(() => {
+    if (!editingTask) return;
+    fetch(`${baseUrl}/api/tasks/projects`)
+      .then(r => r.json())
+      .then(d => setProjects(d.projects ?? []))
+      .catch(() => {});
+  }, [editingTask, baseUrl]);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    createTask.mutate({ data: { title: newTitle.trim(), priority: "Medium", status: "Not started" } },
-      { onSuccess: () => { setNewTitle(""); inv(); } });
+    createTask.mutate(
+      { data: { title: newTitle.trim(), priority: "Medium", status: "Not started" } },
+      { onSuccess: () => { setNewTitle(""); inv(); } }
+    );
+  };
+
+  const handleMove = (id: string, status: KanbanStatus) => {
+    updateTask.mutate({ taskId: id, data: { status } }, { onSuccess: inv });
   };
 
   const handleMarkDone = (id: string) =>
@@ -153,21 +189,40 @@ export function TasksCard() {
 
   const handleStartEdit = (t: Task) => {
     setEditingTask(t);
-    setEditForm({ title: t.title, priority: t.priority ?? "Medium", status: t.status ?? "Not started", due_date: t.due_date ?? "", notes: t.notes ?? "" });
+    setEditForm({
+      title: t.title,
+      priority: t.priority ?? "Medium",
+      status: t.status ?? "Not started",
+      due_date: t.due_date ?? "",
+      notes: t.notes ?? "",
+      project_id: t.project_id ?? "",
+    });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingTask) return;
-    updateTask.mutate({
-      taskId: editingTask.id,
-      data: { title: editForm.title, priority: editForm.priority as any, status: editForm.status, due_date: editForm.due_date || null, notes: editForm.notes || null },
-    }, { onSuccess: () => { setEditingTask(null); inv(); } });
+    await fetch(`${baseUrl}/api/tasks/${editingTask.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editForm.title,
+        priority: editForm.priority || null,
+        status: editForm.status || null,
+        due_date: editForm.due_date || null,
+        notes: editForm.notes || null,
+        project_id: editForm.project_id || null,
+      }),
+    });
+    setEditingTask(null);
+    inv();
   };
 
   if (isLoading) return (
     <div className="bento-card rounded-3xl p-5 space-y-3">
       <div className="h-5 w-36 bg-white/8 rounded-full animate-pulse" />
-      {[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-white/[0.03] rounded-2xl animate-pulse" />)}
+      <div className="grid grid-cols-3 gap-3">
+        {[...Array(3)].map((_, i) => <div key={i} className="h-32 bg-white/[0.03] rounded-2xl animate-pulse" />)}
+      </div>
     </div>
   );
 
@@ -177,12 +232,22 @@ export function TasksCard() {
     </div>
   );
 
-  const cat       = data?.categorized ?? { overdue: [], outstanding: [], inProgress: [], todo: [] };
-  const completed = data?.completed ?? [];
-  const totalActive = (cat.overdue?.length ?? 0) + (cat.outstanding?.length ?? 0) + (cat.inProgress?.length ?? 0) + (cat.todo?.length ?? 0);
+  const allTasks = (data?.tasks ?? []) as Task[];
+  const activePipeline = STATUS_PIPELINE.slice(0, 3) as unknown as KanbanStatus[];
+
+  const byStatus: Record<KanbanStatus, Task[]> = {
+    "Not started": [], "In progress": [], "In Review": [], "Done": [],
+  };
+  for (const t of allTasks) {
+    const s = (t.status ?? "Not started") as KanbanStatus;
+    if (s in byStatus) byStatus[s].push(t);
+    else byStatus["Not started"].push(t);
+  }
+  const doneTasks = [...byStatus["Done"], ...(data?.completed ?? []) as Task[]];
+  const totalActive = allTasks.filter(t => (t.status ?? "").toLowerCase() !== "done").length;
 
   return (
-    <div className="bento-card rounded-3xl p-5 flex flex-col">
+    <div className="bento-card rounded-3xl p-5">
 
       {/* Header */}
       <div className="flex items-center gap-2.5 mb-4">
@@ -208,43 +273,72 @@ export function TasksCard() {
         </button>
       </form>
 
-      {/* Sections */}
-      <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[500px] pr-0.5 bento-scrollbar">
-        <Section sectionKey="overdue"     tasks={cat.overdue ?? []}             onDone={handleMarkDone} onDelete={handleDelete} onEdit={handleStartEdit} />
-        <Section sectionKey="outstanding" tasks={cat.outstanding ?? []}         onDone={handleMarkDone} onDelete={handleDelete} onEdit={handleStartEdit} />
-        <Section sectionKey="inProgress"  tasks={(cat as any).inProgress ?? []} onDone={handleMarkDone} onDelete={handleDelete} onEdit={handleStartEdit} />
-        <Section sectionKey="todo"        tasks={cat.todo ?? []}                onDone={handleMarkDone} onDelete={handleDelete} onEdit={handleStartEdit} />
+      {/* Kanban columns */}
+      <div className="grid grid-cols-3 gap-3">
+        {activePipeline.map(status => {
+          const cfg   = COLUMN_CFG[status];
+          const tasks = byStatus[status];
 
-        {totalActive === 0 && (
-          <div className="text-center py-10 text-slate-600 text-sm flex flex-col items-center gap-2">
-            <CheckCircle2 size={28} className="text-emerald-500/40" />
-            All clear — no active tasks!
-          </div>
-        )}
+          return (
+            <div key={status} className={`rounded-2xl border ${cfg.border} ${cfg.bg} flex flex-col`}>
+              {/* Column header */}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-t-2xl ${cfg.headerBg}`}>
+                <span className="text-[10px] font-bold tracking-widest uppercase"
+                  style={{ color: cfg.accent }}>{cfg.label}</span>
+                <span className="ml-auto text-[10px] font-bold rounded-full w-[18px] h-[18px] flex items-center justify-center"
+                  style={{ background: cfg.accent + "22", color: cfg.accent }}>
+                  {tasks.length}
+                </span>
+              </div>
 
-        {/* Completed */}
-        {completed.length > 0 && (
-          <div className="border-t border-white/[0.05] pt-3">
-            <button onClick={() => setShowCompleted(v => !v)}
-              className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-400 transition-colors w-full px-1 mb-2">
-              {showCompleted ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              <CheckCircle2 size={12} className="text-emerald-500/60" />
-              Completed ({completed.length})
-            </button>
-            {showCompleted && (
-              <div className="space-y-1 opacity-50">
-                {completed.map(t => (
-                  <div key={t.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl">
-                    <CheckCircle2 size={12} className="text-emerald-500 flex-shrink-0" />
-                    <span className="text-sm text-slate-400 line-through truncate">{t.title}</span>
-                    {t.due_date && <span className="text-[11px] text-slate-600 ml-auto flex-shrink-0">{safeDue(t.due_date)}</span>}
+              {/* Cards */}
+              <div className="flex flex-col gap-2 p-2 min-h-[80px]">
+                {tasks.length === 0 && (
+                  <div className="flex items-center justify-center py-4">
+                    <Circle size={14} className="text-slate-700" />
                   </div>
+                )}
+                {tasks.map(t => (
+                  <KanbanCard
+                    key={t.id}
+                    task={t}
+                    pipeline={STATUS_PIPELINE as unknown as KanbanStatus[]}
+                    onMove={handleMove}
+                    onEdit={handleStartEdit}
+                    onDone={handleMarkDone}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Done / Completed toggle */}
+      {doneTasks.length > 0 && (
+        <div className="mt-3 border-t border-white/[0.05] pt-3">
+          <button
+            onClick={() => setShowDone(v => !v)}
+            className="flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-slate-400 transition-colors w-full"
+          >
+            <CheckCircle2 size={12} className="text-emerald-500/60" />
+            Completed ({doneTasks.length})
+            <ChevronRight size={12} className={`ml-auto transition-transform ${showDone ? "rotate-90" : ""}`} />
+          </button>
+          {showDone && (
+            <div className="mt-2 space-y-1 opacity-60">
+              {doneTasks.map(t => (
+                <div key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded-xl">
+                  <CheckCircle2 size={11} className="text-emerald-500 flex-shrink-0" />
+                  <span className="text-sm text-slate-400 line-through truncate">{t.title}</span>
+                  {t.due_date && <span className="text-[11px] text-slate-600 ml-auto flex-shrink-0">{safeDue(t.due_date)}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editingTask && (
@@ -256,18 +350,22 @@ export function TasksCard() {
                 <X size={15} />
               </button>
             </div>
+
             <div className="space-y-3">
+              {/* Title */}
               <div>
                 <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 block">Title</label>
                 <input autoFocus type="text" value={editForm.title}
                   onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
                   className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all" />
               </div>
+
+              {/* Priority + Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 block">Priority</label>
                   <select value={editForm.priority} onChange={e => setEditForm(f => ({ ...f, priority: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all">
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all appearance-none">
                     <option value="Urgent">Urgent</option>
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -277,18 +375,38 @@ export function TasksCard() {
                 <div>
                   <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 block">Status</label>
                   <select value={editForm.status} onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all">
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all appearance-none">
                     <option value="Not started">Not started</option>
                     <option value="In progress">In progress</option>
+                    <option value="In Review">In Review</option>
                     <option value="Done">Done</option>
                   </select>
                 </div>
               </div>
+
+              {/* Due Date */}
               <div>
                 <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 block">Due Date</label>
                 <input type="date" value={editForm.due_date} onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))}
                   className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all" />
               </div>
+
+              {/* Related Project */}
+              <div>
+                <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 flex items-center gap-1.5 block">
+                  <FolderOpen size={10} />
+                  Related Project
+                </label>
+                <select value={editForm.project_id} onChange={e => setEditForm(f => ({ ...f, project_id: e.target.value }))}
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all appearance-none">
+                  <option value="">— No project —</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Notes */}
               <div>
                 <label className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 block">Notes</label>
                 <textarea rows={2} value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
@@ -296,14 +414,15 @@ export function TasksCard() {
                   className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all resize-none" />
               </div>
             </div>
+
             <div className="flex gap-2 mt-5">
               <button onClick={() => setEditingTask(null)}
                 className="flex-1 bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 rounded-2xl py-2 text-sm font-medium transition-all">
                 Cancel
               </button>
-              <button onClick={handleSaveEdit} disabled={updateTask.isPending}
-                className="flex-1 bg-indigo-600/80 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-2xl py-2 text-sm font-medium transition-all">
-                {updateTask.isPending ? "Saving…" : "Save"}
+              <button onClick={handleSaveEdit}
+                className="flex-1 bg-indigo-600/80 hover:bg-indigo-500 text-white rounded-2xl py-2 text-sm font-medium transition-all">
+                Save
               </button>
             </div>
           </div>

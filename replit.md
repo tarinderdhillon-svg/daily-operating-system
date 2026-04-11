@@ -30,25 +30,31 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ## Daily Operating System App
 
 ### Features
-- **Task Management**: Full CRUD via Notion API (database ID: 3356990a287981128f2ffe49ada5e44f)
-- **Calendar View**: Today/tomorrow schedule (currently mock data, ready for Outlook integration)
-- **AI Chat**: Natural language task management, schedule queries, priority analysis
+- **Kanban Task Board**: 3-column board (Not Started / In Progress / In Review) + completed collapse; move tasks with ◀▶ chevrons; PATCH Notion on move; overdue indicator with red border + strikethrough date; priority colour-coded left border
+- **Edit Modal**: Title, Priority, Status (incl. In Review), Due Date, Notes, Related Project dropdown (fetched from Notion Projects DB)
+- **Calendar View**: Today/tomorrow schedule from Outlook via Replit integration
+- **AI Chat**: Natural language task management, schedule queries, priority analysis (voice + text)
 - **Daily Briefing**: AI-generated tech & business news (6 articles per category)
+- **Daily AI Learning Module**: GPT-4o lesson at 5:30 AM UK, saved to Notion; weekly recap quiz; reflection answer logging; audio playback via Web Speech API (Listen button with pause/stop)
 
 ### Artifacts
 - `artifacts/daily-os` — React + Vite frontend (preview path: `/`)
 - `artifacts/api-server` — Express backend (preview path: `/api`)
 
 ### Backend Routes
-- `GET /api/tasks` — all tasks categorized (overdue, outstanding, inProgress, todo) + completed list
-- `POST /api/tasks` — create task in Notion (fields: title, due_date, priority, status, notes)
-- `PATCH /api/tasks/:id` — update task
+- `GET /api/tasks` — all tasks (tasks array + categorized + completed); each task has project_id, notes
+- `GET /api/tasks/projects` — list Notion Projects DB entries (id, name)
+- `POST /api/tasks` — create task (fields: title, due_date, priority, status, notes, project_id)
+- `PATCH /api/tasks/:id` — update task (supports project_id as relation; pass null to clear)
 - `DELETE /api/tasks/:id` — delete (archive) task
-- `GET /api/calendar` — today/tomorrow events
+- `GET /api/calendar` — today/tomorrow events (Outlook integration)
 - `GET /api/briefing` — get cached briefing
 - `POST /api/briefing` — generate new AI briefing
 - `POST /api/chat` — process natural language commands (multi-turn pending task flow)
 - `POST /api/transcribe` — Whisper audio transcription (multipart/form-data, `audio` field)
+- `GET /api/learning/concept` — today's AI lesson (GPT-4o); cached in Notion "AI Learning Log" DB
+- `GET /api/learning/recap` — weekly recap quiz
+- `POST /api/learning/answer` — save reflection answer to Notion
 
 ### Notion Schema Fields
 - Name (title), Due Date (date), Priority (select: Urgent/High/Medium/Low), Status (status: Not started/In progress/In Review/Done), Notes (rich_text), Owner (people), Related Project (relation)

@@ -11,9 +11,10 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 const NOTION_API_KEY = "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";
-const NOTION_DB_ID  = "3356990a287981128f2ffe49ada5e44f";
+const NOTION_DB_ID   = "3356990a287981128f2ffe49ada5e44f";
+const NOTION_PROJECTS_DB = "3356990a-2879-8110-9d8f-db6ed7291219";
 const NOTION_VERSION = "2022-06-28";
-const DONE_STATUSES = new Set(["done", "complete", "completed"]);
+const DONE_STATUSES  = new Set(["done", "complete", "completed"]);
 const DHILLON_USER_ID = "335d872b-594c-8135-92ba-0002f74d1f33";
 
 interface NotionTask {
@@ -24,16 +25,18 @@ interface NotionTask {
     Priority?: { select: { name: string } | null };
     Status?: { status: { name: string } | null };
     Notes?: { rich_text: Array<{ plain_text: string }> };
+    "Related Project"?: { relation: Array<{ id: string }> };
   };
 }
 
 function parseTask(page: NotionTask) {
-  const title    = page.properties?.Name?.title?.map((t) => t.plain_text).join("") ?? "";
-  const due_date = page.properties?.["Due Date"]?.date?.start ?? null;
-  const priority = (page.properties?.Priority?.select?.name as "Urgent" | "High" | "Medium" | "Low" | null) ?? null;
-  const status   = page.properties?.Status?.status?.name ?? null;
-  const notes    = page.properties?.Notes?.rich_text?.map((t) => t.plain_text).join("") || null;
-  return { id: page.id, title, due_date, priority, status, notes };
+  const title      = page.properties?.Name?.title?.map((t) => t.plain_text).join("") ?? "";
+  const due_date   = page.properties?.["Due Date"]?.date?.start ?? null;
+  const priority   = (page.properties?.Priority?.select?.name as "Urgent" | "High" | "Medium" | "Low" | null) ?? null;
+  const status     = page.properties?.Status?.status?.name ?? null;
+  const notes      = page.properties?.Notes?.rich_text?.map((t) => t.plain_text).join("") || null;
+  const project_id = page.properties?.["Related Project"]?.relation?.[0]?.id ?? null;
+  return { id: page.id, title, due_date, priority, status, notes, project_id };
 }
 
 async function notionRequest(path: string, method = "GET", body?: object) {
@@ -52,6 +55,23 @@ async function notionRequest(path: string, method = "GET", body?: object) {
   return json;
 }
 
+router.get("/projects", async (req, res): Promise<void> => {
+  try {
+    const data = await notionRequest(`/databases/${NOTION_PROJECTS_DB}/query`, "POST", {
+      page_size: 50,
+      sorts: [{ property: "Name", direction: "ascending" }],
+    });
+    const projects = (data.results as Array<{ id: string; properties: { Name?: { title: Array<{ plain_text: string }> } } }>).map(p => ({
+      id: p.id,
+      name: p.properties?.Name?.title?.map(t => t.plain_text).join("") ?? "Untitled",
+    }));
+    res.json({ projects });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch projects");
+    res.status(500).json({ projects: [] });
+  }
+});
+
 router.get("/", async (req, res): Promise<void> => {
   try {
     const data = await notionRequest(`/databases/${NOTION_DB_ID}/query`, "POST", {
@@ -69,20 +89,19 @@ router.get("/", async (req, res): Promise<void> => {
     const overdue:     typeof activeTasks = [];
     const outstanding: typeof activeTasks = [];
     const inProgress:  typeof activeTasks = [];
+    const inReview:    typeof activeTasks = [];
     const todo:        typeof activeTasks = [];
 
     for (const task of activeTasks) {
+      const statusLower = (task.status ?? "").toLowerCase();
+      if (statusLower === "in progress") { inProgress.push(task); continue; }
+      if (statusLower === "in review")   { inReview.push(task);   continue; }
       if (task.due_date) {
         const d = new Date(task.due_date); d.setHours(0, 0, 0, 0);
         if (d < today)    { overdue.push(task);     continue; }
         if (d <= nextWeek){ outstanding.push(task); continue; }
       }
-      // Not urgently dated — bucket by status
-      if ((task.status ?? "").toLowerCase() === "in progress") {
-        inProgress.push(task);
-      } else {
-        todo.push(task);
-      }
+      todo.push(task);
     }
 
     res.json(
@@ -107,6 +126,7 @@ router.post("/", async (req, res): Promise<void> => {
   }
 
   const { title, due_date, priority, status, notes } = parsed.data;
+  const project_id = req.body.project_id as string | undefined;
 
   try {
     const properties: Record<string, unknown> = {
@@ -114,9 +134,10 @@ router.post("/", async (req, res): Promise<void> => {
       Status: { status: { name: status ?? "Not started" } },
       Owner:  { people: [{ id: DHILLON_USER_ID }] },
     };
-    if (due_date) properties["Due Date"] = { date: { start: due_date } };
-    if (priority) properties["Priority"] = { select: { name: priority } };
-    if (notes)    properties["Notes"]    = { rich_text: [{ text: { content: notes } }] };
+    if (due_date)    properties["Due Date"]        = { date: { start: due_date } };
+    if (priority)    properties["Priority"]        = { select: { name: priority } };
+    if (notes)       properties["Notes"]           = { rich_text: [{ text: { content: notes } }] };
+    if (project_id)  properties["Related Project"] = { relation: [{ id: project_id }] };
 
     const page = await notionRequest("/pages", "POST", {
       parent: { database_id: NOTION_DB_ID },
@@ -145,6 +166,7 @@ router.patch("/:taskId", async (req, res): Promise<void> => {
 
   const { taskId } = paramsParsed.data;
   const { title, status, priority, due_date, notes } = bodyParsed.data;
+  const project_id = req.body.project_id as string | null | undefined;
 
   try {
     const properties: Record<string, unknown> = {};
@@ -154,6 +176,11 @@ router.patch("/:taskId", async (req, res): Promise<void> => {
     if (due_date != null) properties["Due Date"] = { date: { start: due_date } };
     else if (due_date === null && "due_date" in bodyParsed.data) properties["Due Date"] = { date: null };
     if (notes    != null) properties["Notes"]    = { rich_text: [{ text: { content: notes } }] };
+    if (project_id !== undefined) {
+      properties["Related Project"] = project_id
+        ? { relation: [{ id: project_id }] }
+        : { relation: [] };
+    }
 
     await notionRequest(`/pages/${taskId}`, "PATCH", { properties });
     res.json({ success: true, message: "Task updated successfully" });

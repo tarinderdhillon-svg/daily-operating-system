@@ -24,6 +24,7 @@ const TaskItem = zod.object({
   priority: zod.enum(["Urgent", "High", "Medium", "Low"]).nullish(),
   status: zod.string().nullish(),
   notes: zod.string().nullish(),
+  project_id: zod.string().nullish(),
 });
 
 export const GetTasksResponse = zod.object({
