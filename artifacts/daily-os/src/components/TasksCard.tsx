@@ -273,14 +273,14 @@ export function TasksCard() {
         </button>
       </form>
 
-      {/* Kanban columns */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Kanban columns — horizontal scroll on mobile, grid on desktop */}
+      <div className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0 lg:snap-none -mx-1 px-1">
         {activePipeline.map(status => {
           const cfg   = COLUMN_CFG[status];
           const tasks = byStatus[status];
 
           return (
-            <div key={status} className={`rounded-2xl border ${cfg.border} ${cfg.bg} flex flex-col`}>
+            <div key={status} className={`rounded-2xl border ${cfg.border} ${cfg.bg} flex flex-col min-w-[260px] flex-shrink-0 snap-start lg:min-w-0 lg:flex-shrink`}>
               {/* Column header */}
               <div className={`flex items-center gap-2 px-3 py-2 rounded-t-2xl ${cfg.headerBg}`}>
                 <span className="text-[10px] font-bold tracking-widest uppercase"

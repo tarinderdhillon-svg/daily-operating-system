@@ -42,7 +42,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
           {/* Chat Sidebar — spans all rows on the right */}
-          <div className="lg:col-start-9 lg:col-span-4 lg:row-start-1 lg:row-span-4 order-first lg:order-none">
+          <div className="lg:col-start-9 lg:col-span-4 lg:row-start-1 lg:row-span-4 order-last lg:order-none">
             <ErrorBoundary name="Chat">
               <ChatPanel />
             </ErrorBoundary>

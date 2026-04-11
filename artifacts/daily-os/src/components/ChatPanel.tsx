@@ -161,15 +161,14 @@ export function ChatPanel() {
 
   return (
     <div
-      className="rounded-3xl flex flex-col lg:sticky lg:top-6 overflow-hidden"
+      className="rounded-3xl flex flex-col lg:sticky lg:top-6 overflow-hidden h-[480px] lg:h-[calc(100vh-80px)]"
       style={{
         background: "rgba(30, 27, 75, 0.25)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         border: "1px solid rgba(99, 102, 241, 0.18)",
         boxShadow: "0 0 48px -16px rgba(79, 70, 229, 0.25)",
-        height: "calc(100vh - 80px)",
-        minHeight: "600px",
+        minHeight: "400px",
       }}
     >
       {/* Header */}

@@ -184,17 +184,17 @@ export function LearningCard() {
     <div className="bento-card rounded-3xl" style={{ overflow: "visible" }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.04]">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-white/[0.04]">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500/20 to-indigo-500/20 border border-violet-500/20 flex items-center justify-center flex-shrink-0">
             <BookOpen className="h-4 w-4 text-violet-400" strokeWidth={1.5} />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">Daily Learning</span>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 uppercase tracking-wide">AI Powered</span>
             </div>
-            <p className="text-[11px] text-slate-600 mt-0.5">
+            <p className="text-[11px] text-slate-600 mt-0.5 truncate">
               {lesson?.concept
                 ? `${lesson.concept}${lesson.category ? ` · ${lesson.category}` : ""}`
                 : "Build consulting-level AI expertise, one concept at a time"}
@@ -202,7 +202,7 @@ export function LearningCard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
           {/* Audio controls — only when a lesson is loaded */}
           {lesson && !isLoading && (
             <div className="flex items-center gap-1 mr-1">
