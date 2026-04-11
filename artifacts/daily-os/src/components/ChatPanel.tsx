@@ -263,65 +263,77 @@ export function ChatPanel() {
       )}
 
       {/* Input area */}
-      <div className="p-3 border-t border-indigo-500/10 flex-shrink-0">
-        <div className="flex items-end gap-2">
-          {/* Voice button */}
+      <div className="px-3 pb-3 pt-2 border-t border-indigo-500/10 flex-shrink-0">
+
+        {/* Unified input pill */}
+        <div className={`flex items-center gap-0 rounded-2xl transition-all ${
+          isRecording
+            ? "ring-1 ring-red-500/40 bg-black/50"
+            : pendingTask
+              ? "ring-1 ring-amber-500/30 bg-black/40"
+              : "ring-1 ring-indigo-500/20 bg-black/30 focus-within:ring-indigo-500/40"
+        }`}>
+
+          {/* Mic button — inside pill on the left */}
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             disabled={processChat.isPending || isTranscribing}
-            title={isRecording ? "Stop & transcribe" : "Record voice"}
-            className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 mb-0.5 ${
+            title={isRecording ? "Stop recording" : "Record voice"}
+            className={`flex-shrink-0 w-10 h-10 rounded-l-2xl flex items-center justify-center transition-all disabled:opacity-40 ${
               isRecording
-                ? "bg-red-500 hover:bg-red-400 shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse"
+                ? "text-red-400"
                 : isTranscribing
-                  ? "bg-amber-500/20 text-amber-400"
-                  : "bg-white/[0.05] hover:bg-indigo-500/20 border border-indigo-500/20 text-slate-500 hover:text-indigo-300"
+                  ? "text-amber-400"
+                  : "text-slate-500 hover:text-indigo-400"
             }`}
           >
-            {isRecording ? <Square size={12} className="text-white" /> : <Mic size={14} />}
+            {isRecording
+              ? <Square size={13} className="animate-pulse" />
+              : isTranscribing
+                ? <Mic size={15} className="animate-pulse text-amber-400" />
+                : <Mic size={15} />
+            }
           </button>
 
+          {/* Divider */}
+          <div className="w-px h-5 bg-white/[0.06] flex-shrink-0" />
+
           {/* Textarea */}
-          <div className="relative flex-1">
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isRecording ? "Recording… click ■ to stop"
-                : isTranscribing ? "Transcribing…"
-                : pendingTask ? "Reply with missing details…"
-                : "Ask Nova anything…"
-              }
-              disabled={processChat.isPending || voiceBusy}
-              className={`w-full resize-none rounded-2xl py-2.5 pl-3.5 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-1 transition-all disabled:opacity-60 leading-5 max-h-[140px] overflow-y-auto ${
-                isRecording
-                  ? "bg-black/40 border border-red-500/30"
-                  : pendingTask
-                    ? "bg-black/40 border border-amber-500/30 focus:ring-amber-500/25"
-                    : "bg-black/30 border border-indigo-500/20 focus:ring-indigo-500/30 focus:border-indigo-500/40"
-              }`}
-            />
-            <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || processChat.isPending || voiceBusy}
-              className="absolute right-1.5 bottom-1.5 p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-white/[0.05] disabled:text-slate-600 text-white transition-colors"
-            >
-              <Send size={12} />
-            </button>
-          </div>
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              isRecording    ? "Recording… tap ■ to stop"
+              : isTranscribing ? "Transcribing voice…"
+              : pendingTask    ? "Reply with missing details…"
+              : "Ask Nova anything…"
+            }
+            disabled={processChat.isPending || voiceBusy}
+            className="flex-1 resize-none bg-transparent py-2.5 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none leading-5 max-h-[120px] overflow-y-auto disabled:opacity-60 bento-scrollbar"
+          />
+
+          {/* Send button — inside pill on the right */}
+          <button
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || processChat.isPending || voiceBusy}
+            title="Send message"
+            className="flex-shrink-0 w-10 h-10 rounded-r-2xl flex items-center justify-center transition-all text-slate-600 hover:text-indigo-400 disabled:text-slate-700 disabled:hover:text-slate-700"
+          >
+            <Send size={14} className={input.trim() && !processChat.isPending && !voiceBusy ? "text-indigo-400" : ""} />
+          </button>
         </div>
 
+        {/* Recording indicator */}
         {isRecording && (
-          <div className="flex items-center justify-center gap-2 mt-1.5 text-[10px] text-red-400 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
-            Recording — tap ■ when done
+          <div className="flex items-center gap-1.5 mt-1.5 px-1 text-[10px] text-red-400 font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping flex-shrink-0" />
+            Recording — tap the stop icon when done
           </div>
         )}
-        <p className="text-center text-[10px] text-slate-700 mt-1 font-mono">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   );

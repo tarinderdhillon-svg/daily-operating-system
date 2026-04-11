@@ -150,7 +150,7 @@ export function BriefingCard() {
                     className="group block bg-white/[0.02] hover:bg-indigo-500/5 border border-white/[0.05] hover:border-indigo-500/20 rounded-2xl p-3.5 transition-all"
                   >
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-indigo-300 transition-colors line-clamp-2">
+                      <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-indigo-300 transition-colors">
                         {article.title}
                       </h4>
                       <ExternalLink className="h-3.5 w-3.5 text-slate-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
@@ -158,7 +158,7 @@ export function BriefingCard() {
                     <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-2">
                       {article.source} · {article.date}
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-2">{article.summary}</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">{article.summary}</p>
                     {article.key_metrics && (
                       <div className="mt-2 inline-flex px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-mono text-indigo-300">
                         {article.key_metrics}
@@ -184,7 +184,7 @@ export function BriefingCard() {
                     className="group block bg-white/[0.02] hover:bg-emerald-500/5 border border-white/[0.05] hover:border-emerald-500/20 rounded-2xl p-3.5 transition-all"
                   >
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-emerald-300 transition-colors line-clamp-2">
+                      <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-emerald-300 transition-colors">
                         {article.title}
                       </h4>
                       <ExternalLink className="h-3.5 w-3.5 text-slate-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
@@ -192,7 +192,7 @@ export function BriefingCard() {
                     <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-2">
                       {article.source} · {article.date}
                     </div>
-                    <p className="text-xs text-slate-400 line-clamp-2">{article.summary}</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">{article.summary}</p>
                     {article.key_metrics && (
                       <div className="mt-2 inline-flex px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-300">
                         {article.key_metrics}

@@ -304,60 +304,94 @@ router.post("/", async (req, res): Promise<void> => {
     }
 
     // ─── UPDATE / DELETE TASK ────────────────────────────────────────────────
-    const isUpdateIntent =
-      lowerMsg.includes("mark ") || lowerMsg.includes("change ") ||
-      lowerMsg.includes("update ") || lowerMsg.includes("set ") ||
-      lowerMsg.includes("complete ") || lowerMsg.includes("done ") ||
-      (lowerMsg.includes("task") && (lowerMsg.includes(" to ") || lowerMsg.includes("status") || lowerMsg.includes("priority")));
+    // Use Gemini to classify intent broadly — catches "delete X", "remove X",
+    // "mark X done", "update X to high", etc. without requiring "task" keyword.
+    const couldBeTaskCommand =
+      !lowerMsg.startsWith("what") &&
+      !lowerMsg.startsWith("how") &&
+      !lowerMsg.startsWith("why") &&
+      !lowerMsg.startsWith("when") &&
+      !lowerMsg.startsWith("who") &&
+      !lowerMsg.startsWith("is ") &&
+      !lowerMsg.startsWith("are ") &&
+      !lowerMsg.includes("briefing") &&
+      !lowerMsg.includes("schedule") &&
+      !lowerMsg.includes("news") &&
+      (
+        lowerMsg.includes("delete") || lowerMsg.includes("remove") || lowerMsg.includes("archive") ||
+        lowerMsg.includes("trash")  || lowerMsg.includes("mark ")  || lowerMsg.includes("change ") ||
+        lowerMsg.includes("update") || lowerMsg.includes(" set ")  || lowerMsg.includes("rename") ||
+        lowerMsg.includes("complete") || lowerMsg.includes("finish") ||
+        (lowerMsg.includes(" to ")   && (lowerMsg.includes("priority") || lowerMsg.includes("status") || lowerMsg.includes("done") || lowerMsg.includes("progress"))) ||
+        (lowerMsg.includes("priority") && !lowerMsg.includes("show")) ||
+        (lowerMsg.includes("status")   && !lowerMsg.includes("show"))
+      ) &&
+      !lowerMsg.includes("create") && !lowerMsg.includes("add task") && !lowerMsg.includes("new task");
 
-    const isDeleteIntent =
-      (lowerMsg.includes("delete") || lowerMsg.includes("remove") || lowerMsg.includes("archive")) &&
-      lowerMsg.includes("task");
-
-    if ((isUpdateIntent || isDeleteIntent) && !lowerMsg.includes("create") && !lowerMsg.includes("add")) {
-      // Use Gemini to parse the command
-      const parsePrompt = `Parse this task management command. Today is ${TODAY()}.
+    if (couldBeTaskCommand) {
+      const parsePrompt = `You are a task management assistant. Parse this command and return the action to take. Today is ${TODAY()}.
 
 Command: "${message}"
 
-Return ONLY valid JSON (no markdown):
+Return ONLY valid JSON (no markdown, no code fences):
 {
-  "action": "update_status" | "update_priority" | "update_due_date" | "update_title" | "delete" | "unknown",
-  "task_name": "the name of the task to modify (as close to original as possible)",
-  "new_value": "the new status/priority/date/title value, or null for delete"
+  "action": "update_status" | "update_priority" | "update_due_date" | "update_title" | "update_notes" | "delete" | "not_task_command",
+  "task_name": "the name/partial name of the task to modify — strip words like 'task', 'the task', 'my task' (keep only the actual task name)",
+  "new_value": "the new value for status/priority/date/title, or null for delete or not_task_command"
 }
 
 Status values: Not started, In progress, In Review, Done
-Priority values: Urgent, High, Medium, Low
-Date format: YYYY-MM-DD
+Priority values: Urgent, High, Medium, Low  
+Date format: YYYY-MM-DD. Today is ${TODAY()}.
 
 Examples:
-- "mark moving house as done" → action: update_status, task_name: "moving house", new_value: "Done"
-- "change house move to done" → action: update_status, task_name: "house move", new_value: "Done"
-- "set reschedule microsoft training to high priority" → action: update_priority, task_name: "reschedule microsoft training", new_value: "High"
-- "delete the test task" → action: delete, task_name: "test", new_value: null`;
+- "delete test quick add"                    → action: delete,          task_name: "test quick add",           new_value: null
+- "remove complete AI operating system mvp"  → action: delete,          task_name: "complete AI operating system mvp", new_value: null
+- "mark reschedule microsoft as done"        → action: update_status,   task_name: "reschedule microsoft",     new_value: "Done"
+- "change complete AI mvp to high priority"  → action: update_priority, task_name: "complete AI mvp",          new_value: "High"
+- "set moving house to in progress"          → action: update_status,   task_name: "moving house",             new_value: "In progress"
+- "update microsoft training due date to 20th April" → action: update_due_date, task_name: "microsoft training", new_value: "2026-04-20"
+- "rename house task to buy house"           → action: update_title,    task_name: "house",                    new_value: "buy house"
+- "the weather is nice today"                → action: not_task_command, task_name: null, new_value: null
 
-      let parsed: { action: string; task_name: string | null; new_value: string | null } = { action: "unknown", task_name: null, new_value: null };
+If you are not confident this is a task management command, return action: "not_task_command".`;
+
+      let parsed: { action: string; task_name: string | null; new_value: string | null } = { action: "not_task_command", task_name: null, new_value: null };
       try {
         let raw = await geminiGenerate(parsePrompt);
         raw = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
+        const jsonStart = raw.indexOf("{");
+        const jsonEnd   = raw.lastIndexOf("}");
+        if (jsonStart !== -1 && jsonEnd !== -1) raw = raw.slice(jsonStart, jsonEnd + 1);
         parsed = JSON.parse(raw);
-      } catch { /* fall through to unknown */ }
+      } catch { /* fall through */ }
 
-      if (parsed.action !== "unknown" && parsed.task_name) {
-        // Find task by fuzzy name match
+      if (parsed.action !== "not_task_command" && parsed.action !== "unknown" && parsed.task_name) {
+        // Find task by fuzzy name match — multiple strategies
         const allTasks = await getTasksFromNotion();
-        const queryLower = parsed.task_name.toLowerCase();
-        const matched = allTasks.find((t: { title: string }) =>
-          t.title.toLowerCase().includes(queryLower) ||
-          queryLower.includes(t.title.toLowerCase()) ||
-          t.title.toLowerCase().split(" ").some((w: string) => w.length > 3 && queryLower.includes(w))
-        ) as { id: string; title: string } | undefined;
+        const queryLower = parsed.task_name.toLowerCase().trim();
+
+        const matched = allTasks.find((t: { title: string }) => {
+          const titleLower = t.title.toLowerCase();
+          // 1. Exact match
+          if (titleLower === queryLower) return true;
+          // 2. Title contains the full query
+          if (titleLower.includes(queryLower)) return true;
+          // 3. Query contains the full title
+          if (queryLower.includes(titleLower)) return true;
+          // 4. All significant words in query appear in title
+          const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+          const matchCount = queryWords.filter(w => titleLower.includes(w)).length;
+          if (queryWords.length > 0 && matchCount / queryWords.length >= 0.7) return true;
+          return false;
+        }) as { id: string; title: string } | undefined;
 
         if (!matched) {
+          // List available tasks to help the user
+          const taskNames = allTasks.slice(0, 8).map((t: { title: string }) => `• ${t.title}`).join("\n");
           res.json({
             success: true,
-            response: `I couldn't find a task matching "${parsed.task_name}". Try "show my tasks" to see the exact names.`,
+            response: `I couldn't find a task matching "${parsed.task_name}". Here are your current tasks:\n\n${taskNames}\n\nTry using the exact task name.`,
             action_taken: "task_not_found",
             data: null,
           });
@@ -365,10 +399,11 @@ Examples:
         }
 
         if (parsed.action === "delete") {
+          // Archive in Notion — this removes it from active views
           await notionRequest(`/pages/${matched.id}`, "PATCH", { archived: true });
           res.json({
             success: true,
-            response: `Task "${matched.title}" has been deleted.`,
+            response: `Task "${matched.title}" has been archived and removed from your board.`,
             action_taken: "task_deleted",
             data: { task_id: matched.id, title: matched.title },
           });
@@ -391,20 +426,23 @@ Examples:
         } else if (parsed.action === "update_title" && parsed.new_value) {
           updateProps["Name"] = { title: [{ text: { content: parsed.new_value } }] };
           summary = `renamed to "${parsed.new_value}"`;
+        } else if (parsed.action === "update_notes" && parsed.new_value) {
+          updateProps["Notes"] = { rich_text: [{ text: { content: parsed.new_value } }] };
+          summary = `notes updated`;
         }
 
         if (Object.keys(updateProps).length > 0) {
           await notionRequest(`/pages/${matched.id}`, "PATCH", { properties: updateProps });
           res.json({
             success: true,
-            response: `Task "${matched.title}" updated — ${summary}.`,
+            response: `Done — "${matched.title}" updated: ${summary}.`,
             action_taken: "task_updated",
             data: { task_id: matched.id, title: matched.title },
           });
           return;
         }
       }
-      // If we couldn't parse intent clearly, fall through to general AI
+      // If Gemini said not_task_command, fall through to general AI
     }
 
     // ─── SHOW TASKS ──────────────────────────────────────────────────────────
