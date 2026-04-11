@@ -209,7 +209,20 @@ router.get("/", async (req, res): Promise<void> => {
   res.json({ success: true, briefing: null });
 });
 
+// How long before we allow a forced re-generation (6 hours)
+const REGEN_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
 router.post("/", async (req, res): Promise<void> => {
+  // If a fresh briefing exists (less than 6 hours old), return it immediately
+  // without calling Gemini — saves ~12 API calls per click
+  if (cachedBriefing) {
+    const ageMs = Date.now() - new Date(cachedBriefing.generated_at).getTime();
+    if (ageMs < REGEN_COOLDOWN_MS) {
+      req.log.info({ ageMs }, "Briefing still fresh — returning cached version");
+      res.json({ success: true, briefing: cachedBriefing });
+      return;
+    }
+  }
   try {
     req.log.info("Generating daily briefing with Gemini + Google Search grounding…");
     cachedBriefing = await buildBriefing();

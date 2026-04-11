@@ -230,17 +230,17 @@ router.post("/", async (req, res): Promise<void> => {
       if (isNoneAnswer(supplement.status))                      merged.status          = null;
       if (isNoneAnswer(supplement.related_project) || rawNoneProject) merged.related_project = "";
 
+      // Only block on the essentials — status/notes/project default silently
       const stillMissing: string[] = [];
-      if (!merged.due_date)              stillMissing.push("due date");
-      if (!merged.priority)              stillMissing.push("priority (Urgent, High, Medium, or Low)");
-      if (!merged.status)                stillMissing.push("status (Not started, In progress, or In Review)");
-      if (merged.notes === null)         stillMissing.push("notes / any extra context (or say 'none')");
-      if (merged.related_project === null) stillMissing.push("related project (Day-to-Day Life, Navaigate, Work, L&D — or say 'none')");
+      if (!merged.due_date) stillMissing.push("due_date");
+      if (!merged.priority) stillMissing.push("priority");
 
       if (stillMissing.length > 0) {
+        const labels: Record<string, string> = { due_date: "due date", priority: "priority (Urgent/High/Medium/Low)" };
+        const labelList = stillMissing.map(f => `• ${labels[f] ?? f}`).join("\n");
         res.json({
           success: true,
-          response: `Still need a couple more details:\n\n• ${stillMissing.join("\n• ")}\n\nOr say "skip" to create it with defaults.`,
+          response: `Almost there — just fill in the remaining details below:\n\n${labelList}\n\nOr say "skip" to create now with defaults.`,
           action_taken: "task_pending",
           data: { ...merged, missing_fields: stillMissing },
         });
@@ -269,24 +269,24 @@ router.post("/", async (req, res): Promise<void> => {
       if (!extracted.title) {
         res.json({
           success: true,
-          response: "I'd like to create a task for you. What should I call it?",
+          response: "I'd like to create a task for you. Fill in the details below:",
           action_taken: "task_pending",
-          data: { title: null, due_date: null, priority: null, status: null, notes: null, missing_fields: ["title", "due date", "priority", "status"] },
+          data: { title: null, due_date: null, priority: null, status: null, notes: null, missing_fields: ["title", "due_date", "priority"] },
         });
         return;
       }
 
+      // Only block on essentials — status/notes/project get silent defaults
       const missing: string[] = [];
-      if (!extracted.due_date)              missing.push("due date");
-      if (!extracted.priority)              missing.push("priority (Urgent, High, Medium, or Low)");
-      if (!extracted.status)                missing.push("status (Not started, In progress, or In Review)");
-      if (!extracted.notes)                 missing.push("notes / any extra context (or say 'none')");
-      if (extracted.related_project === null) missing.push("related project (Day-to-Day Life, Navaigate, Work, L&D — or say 'none')");
+      if (!extracted.due_date) missing.push("due_date");
+      if (!extracted.priority) missing.push("priority");
 
       if (missing.length > 0) {
+        const labels: Record<string, string> = { due_date: "due date", priority: "priority (Urgent/High/Medium/Low)" };
+        const labelList = missing.map(f => `• ${labels[f] ?? f}`).join("\n");
         res.json({
           success: true,
-          response: `Got it — I'll create **"${extracted.title}"**. I just need a few more details:\n\n• ${missing.join("\n• ")}\n\nPlease provide them, or say "skip" to create it with defaults.`,
+          response: `Got it — creating **"${extracted.title}"**. Just need:\n\n${labelList}\n\nFill in below, or say "skip" to create now with defaults.`,
           action_taken: "task_pending",
           data: { ...extracted, missing_fields: missing },
         });
