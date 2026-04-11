@@ -4,11 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-// PORT is only needed for the dev server — default to 3000 for build-time
 const rawPort = process.env.PORT ?? "3000";
-const port = Number(rawPort);
-
-// BASE_PATH defaults to "/" — needed at build time for asset references
+const port    = Number(rawPort);
 const basePath = process.env.BASE_PATH ?? "/";
 
 export default defineConfig({
@@ -21,9 +18,7 @@ export default defineConfig({
     process.env.REPL_ID !== undefined
       ? [
           await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
+            m.cartographer({ root: path.resolve(import.meta.dirname, "..") }),
           ),
           await import("@replit/vite-plugin-dev-banner").then((m) =>
             m.devBanner(),
@@ -42,6 +37,20 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Chunk splitting — mobile gets smaller initial JS, loads rest in parallel
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Only split what we know — let everything else fall through to Rollup
+          if (id.includes("/node_modules/react-dom/"))        return "vendor-react";
+          if (id.includes("/node_modules/react/"))            return "vendor-react";
+          if (id.includes("/node_modules/scheduler/"))        return "vendor-react";
+          if (id.includes("/node_modules/@tanstack/"))        return "vendor-query";
+          if (id.includes("/node_modules/lucide-react/"))     return "vendor-icons";
+          if (id.includes("/node_modules/date-fns/"))         return "vendor-date";
+        },
+      },
+    },
   },
   server: {
     port,

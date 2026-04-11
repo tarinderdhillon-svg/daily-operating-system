@@ -10,6 +10,11 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      // Keep data fresh for 5 minutes — prevents hammering Notion/Outlook on
+      // every mobile app-switch or tab focus, massively reduces load on return
+      staleTime: 5 * 60 * 1000,
+      // Keep unused query results in cache for 10 minutes
+      gcTime: 10 * 60 * 1000,
     },
   },
 });

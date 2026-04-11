@@ -1,10 +1,27 @@
-import { TasksCard } from "@/components/TasksCard";
-import { CalendarCard } from "@/components/CalendarCard";
-import { BriefingCard } from "@/components/BriefingCard";
-import { ChatPanel } from "@/components/ChatPanel";
-import { LearningCard } from "@/components/LearningCard";
+import { lazy, Suspense } from "react";
+import { TasksCard }     from "@/components/TasksCard";
+import { CalendarCard }  from "@/components/CalendarCard";
+import { BriefingCard }  from "@/components/BriefingCard";
+import { ChatPanel }     from "@/components/ChatPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { format } from "date-fns";
+import { format }        from "date-fns";
+
+// Lazy-load the Learning card — it's below the fold and not critical at startup
+const LearningCard = lazy(() =>
+  import("@/components/LearningCard").then(m => ({ default: m.LearningCard }))
+);
+
+function LearningFallback() {
+  return (
+    <div className="bento-card rounded-3xl p-5 h-28 animate-pulse flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-white/[0.04] shrink-0" />
+      <div className="space-y-2 flex-1">
+        <div className="h-3 bg-white/[0.04] rounded-full w-1/3" />
+        <div className="h-2 bg-white/[0.03] rounded-full w-2/3" />
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const greeting = (() => {
@@ -16,9 +33,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0a0a14] text-slate-200 p-4 md:p-6 font-sans selection:bg-indigo-500/30 overflow-x-hidden relative">
-      {/* Background ambient glows */}
-      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-indigo-600/8 rounded-full blur-[160px] pointer-events-none" />
+
+      {/* Background glows — hidden on mobile (too GPU-heavy for Safari) */}
+      <div className="hidden lg:block fixed top-0 left-1/4 w-[500px] h-[500px] bg-violet-600/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="hidden lg:block fixed bottom-0 right-1/4 w-[600px] h-[600px] bg-indigo-600/8 rounded-full blur-[160px] pointer-events-none" />
 
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
@@ -69,10 +87,12 @@ export default function Dashboard() {
             </ErrorBoundary>
           </div>
 
-          {/* Learning Module */}
+          {/* Learning Module — lazy loaded, below the fold */}
           <div className="lg:col-start-1 lg:col-span-8 lg:row-start-5">
             <ErrorBoundary name="Learning">
-              <LearningCard />
+              <Suspense fallback={<LearningFallback />}>
+                <LearningCard />
+              </Suspense>
             </ErrorBoundary>
           </div>
 

@@ -321,11 +321,14 @@ export function ChatPanel() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
 
+      // iOS Safari supports mp4/aac, not webm/ogg
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
           ? "audio/webm"
-          : "audio/ogg";
+          : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : "audio/mp4"; // iOS Safari fallback
 
       const recorder = new MediaRecorder(stream, { mimeType });
       recorder.ondataavailable = (e) => {
@@ -359,7 +362,9 @@ export function ChatPanel() {
   const transcribeAudio = async (blob: Blob, mimeType: string) => {
     try {
       const formData = new FormData();
-      const ext = mimeType.includes("ogg") ? "ogg" : "webm";
+      const ext = mimeType.includes("ogg") ? "ogg"
+        : mimeType.includes("mp4") || mimeType.includes("aac") || mimeType.includes("m4a") ? "mp4"
+        : "webm";
       formData.append("audio", blob, `recording.${ext}`);
 
       const res  = await fetch(`${baseUrl}/api/transcribe`, { method: "POST", body: formData });
@@ -388,15 +393,8 @@ export function ChatPanel() {
 
   return (
     <div
-      className="rounded-3xl flex flex-col lg:sticky lg:top-6 overflow-hidden h-[480px] lg:h-[calc(100vh-80px)]"
-      style={{
-        background: "rgba(30, 27, 75, 0.25)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(99, 102, 241, 0.18)",
-        boxShadow: "0 0 48px -16px rgba(79, 70, 229, 0.25)",
-        minHeight: "400px",
-      }}
+      className="chat-panel-glass rounded-3xl flex flex-col lg:sticky lg:top-6 overflow-hidden h-[480px] lg:h-[calc(100vh-80px)]"
+      style={{ minHeight: "400px" }}
     >
       {/* Header */}
       <div className="p-4 pb-3.5 border-b border-indigo-500/10 flex items-center gap-3 flex-shrink-0">
