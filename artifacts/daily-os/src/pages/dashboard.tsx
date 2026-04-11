@@ -2,6 +2,7 @@ import { TasksCard } from "@/components/TasksCard";
 import { CalendarCard } from "@/components/CalendarCard";
 import { BriefingCard } from "@/components/BriefingCard";
 import { ChatPanel } from "@/components/ChatPanel";
+import { LearningCard } from "@/components/LearningCard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { format } from "date-fns";
 
@@ -65,6 +66,13 @@ export default function Dashboard() {
           <div className="lg:col-start-1 lg:col-span-8 lg:row-start-3 lg:row-span-2">
             <ErrorBoundary name="Tasks">
               <TasksCard />
+            </ErrorBoundary>
+          </div>
+
+          {/* Learning Module */}
+          <div className="lg:col-start-1 lg:col-span-8 lg:row-start-5">
+            <ErrorBoundary name="Learning">
+              <LearningCard />
             </ErrorBoundary>
           </div>
 

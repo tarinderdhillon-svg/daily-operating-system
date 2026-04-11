@@ -1,0 +1,144 @@
+BUILD A DAILY AI LEARNING MODULE FOR  DAILY OS
+I want to add an intelligent learning system to my Daily Operating System (Daily OS). This module should automatically teach me one transformative AI concept every morning at 5.30 AM UK time, persisting lessons to Notion, and tracking my progress.
+Core Purpose
+Create a daily automated learning engine that selects AI concepts from a structured curriculum, generates personalized lessons using OpenAI, saves them to Notion, and helps me build consulting-level expertise in AI by compounding knowledge over time.
+Key Principles (Follow These Strictly)
+1. Curriculum Structure (No Random Topics) I want concepts organized into 4 rotating categories with specific weightings:
+* Foundations (40%): supervised learning, embeddings, transformers, optimization, etc.
+* LLM/GenAI (35%): tokens, RAG, function calling, evals, hallucinations, structured outputs
+* Modern Trends (15%): agents, multimodal AI, computer use, model routing
+* Enterprise (10%): governance, ROI measurement, adoption barriers, human-in-the-loop
+The system should never teach the same concept twice if it's marked as "Mastered." It should avoid repeating concepts from the last 30 days. Difficulty should adapt: start with Beginner, increase to Intermediate after 3+ successful quiz attempts at that level.
+2. Lesson Quality Over Quantity Every lesson must follow a strict 7-section structure, always:
+1. Concept name, category, and difficulty level
+2. Plain-English explanation (150-200 words) - explain what it does, not how technically
+3. Why it matters for AI consulting (80-120 words) - connect to client value, not theory
+4. Real business example (100-150 words) - use recognizable companies, show metrics and outcomes
+5. Connections and context (50-100 words) - list 2-3 related concepts and how they connect
+6. One reflection question (simple language, can be answered in 1-2 sentences, tests understanding not memorization)
+7. One practical takeaway (concrete action they can take today)
+Total response must be 600-800 words maximum. Tone should be like a senior consulting partner, not a textbook. Be confident and direct—no hedging language like "might" or "could." Use second-person perspective.
+3. Daily Automation (Zero Manual Intervention) The system should trigger automatically every morning at5.30 AM UK time using a scheduler. It should:
+* Read the learning history from Notion
+* Check what's already been taught and mastered
+* Select the next concept intelligently (weighted by category, avoiding repeats)
+* Call OpenAI to generate the lesson
+* Save the concept and lesson to Notion
+* Return the lesson to the frontend for display
+No Zapier, no external services. Everything runs inside Replit using built-in scheduling.
+4. Weekly Recap (Not Another Lesson) On Fridays and Sundays, the system should skip teaching a new concept and instead:
+* Generate a 3-question quiz on the week's concepts
+* Provide a 1-2 sentence summary of each concept taught
+* Identify which category was weakest
+* Suggest one resource, YouTube video or concept to focus on next week
+* Show top 2 consulting-relevant takeaways from the week
+This keeps knowledge fresh through spaced repetition, not by drowning in new content.
+5. Persistent Learning Log (Notion as Source of Truth) All concepts must be saved to Notion with:
+* Concept name (required)
+* Category (Foundations / LLM-GenAI / Modern Trends / Enterprise/)
+* Difficulty (Beginner / Intermediate / Advanced)
+* Full lesson text
+* Date taught
+* Status (New / Reviewed / Mastered / Weak)
+* Quiz answer (when provided)
+* Quiz score (1-3 scale, filled when I answer the reflection question)
+The system should query this history before generating each lesson to avoid repeats and understand my learning progression.
+6. Token Efficiency (Costs ~$0.08/month)
+* Use GPT-4o for lesson generation (not GPT-4)
+* Set max_tokens to 1200 (not higher)
+* Keep temperature at 0.7 (warm but precise)
+* Reuse the system prompt every call (don't rebuild it)
+* Estimated cost: ~900 tokens × 30 days × $0.003/1K = ~$0.08/month
+This is not about being cheap—it's about being smart. Every token counts toward quality.
+7. Frontend Integration (Chat Panel Buttons) Add two buttons to my Daily OS chat interface:
+* "Today's Concept" button: Calls the API and displays today's lesson in the chat panel
+* "Weekly Recap" button: Calls the API with a recap flag and shows the weekly quiz and summary
+Below the lesson, add a simple text input where I can answer the reflection question. Include a "Save Answer" button that captures my response (full quiz answer persistence is Phase 2).
+Technical Requirements
+Backend Structure I have OpenAI API and Notion API already connected to my Replit Daily OS. The system needs:
+* An Express route at /api/learning/concept that handles GET requests
+* A controller that orchestrates concept selection, lesson generation, and Notion saves
+* A scheduler that triggers the route automatically at 5:30 AM UK time every day
+* Proper environment variables for API keys (OPENAI_API_KEY, NOTION_API_KEY, NOTION_LEARNING_DB_ID)
+Notion Database Structure Create a database called "AI Learning Log" with these columns:
+* Name (Title): Concept name
+* Category (Select): Foundations / LLM-GenAI / Modern Trends / Enterprise
+* Difficulty (Select): Beginner / Intermediate / Advanced
+* Date (Date): When the concept was taught
+* Status (Select): New / Reviewed / Mastered / Weak
+* Lesson (Text): Full lesson content
+* Quiz Answer (Text): My response to the reflection question
+* Quiz Score (Number): 1-3 scale
+* Is Recap (Checkbox): True if Friday/Sunday
+Frontend Requirements Add to the chat panel HTML:
+* Two side-by-side buttons for "Today's Concept" and "Weekly Recap"
+* A message div where lessons display (formatted nicely with clear sections)
+* A text input field below the lesson for answering the reflection question
+* A "Save Answer" button
+Scheduling Requirements Use a built-in Node.js scheduler that:
+* Runs every day at 5:30 AM UK time (cron: 0 7 * * *)
+* Calls the /api/learning/concept endpoint
+* Logs confirmation to the console
+* Does not depend on external services
+What NOT to Build (Phase 2 Features)
+Don't include yet:
+* Spaced repetition logic (revisiting old concepts)
+* Difficulty auto-adaptation based on quiz scores
+* "Compare Concepts" mode (RAG vs fine-tuning)
+* Monthly synthesis reports
+* Email notifications or Slack integration
+These come later. Focus on core: daily lesson generation, Notion persistence, scheduling, basic frontend display.
+Success Criteria
+When done, I should be able to:
+1. Click "Today's Concept" button and see a full lesson appear in the chat within 2-3 seconds
+2. See the lesson properly formatted with all 7 sections readable
+3. Answer the reflection question in the text field and click "Save"
+4. Check my Notion database and see the concept saved with date, category, and full text
+5. Wait until 5:30 AM UK the next day and see a new concept auto-generated in Notion
+6. Observe that Friday's auto-trigger generates a recap instead of a new lesson
+7. Use the system every day without manual setup or intervention
+OpenAI System Prompt (Your Reference)
+The lessons should be generated by an AI that understands it's an elite consulting mentor. The prompt emphasizes:
+* Never repeat mastered concepts or concepts from the past 30 days
+* Always deliver the 7-section structure exactly
+* Write for a senior consultant audience, not academics
+* Connect every concept to real business value
+* Use recognizable companies and concrete outcomes as examples
+* Adapt difficulty based on learning history
+* Keep responses between 600-800 words
+* Use second-person perspective ("You should think about...")
+* Avoid disclaimers, meta-commentary, or "as an AI" language
+Implementation Priority
+1. First: Set up the basic API endpoint and Notion integration so lessons save correctly
+2. Second: Build the scheduler so it triggers daily
+3. Third: Create the curriculum data structure with 30+ concepts
+4. Fourth: Add the frontend buttons and chat display
+5. Fifth: Test the full flow end-to-end
+Files You'll Need to Create/Modify
+* Create: /data/curriculum.json (contains all 30+ concepts organized by category)
+* Create: /controllers/learningController.js (handles concept selection, OpenAI calls, Notion saves)
+* Create: /routes/learning.js (Express route handler)
+* Modify: /index.js or /server.js (add scheduler and route registration)
+* Modify: Your Daily OS HTML chat panel (add buttons and lesson display area)
+* Modify: .env (add/verify OPENAI_API_KEY, NOTION_API_KEY, NOTION_LEARNING_DB_ID)
+Environment Variables Required
+* OPENAI_API_KEY 
+* NOTION_API_KEY 
+* NOTION_LEARNING_DB_ID - The ID of your AI Learning Log database in Notion
+* TIMEZONE - Set to "Europe/London" for 5:30 AM UK trigger
+* PORT 
+Final Expectation
+By the end of Week 1:
+* 7 concepts in Notion
+* Scheduler confirmed running daily
+* Buttons in chat panel work
+* Lessons are readable and follow the 7-section structure
+By end of Month 1:
+* 28 concepts learned
+* Can discuss RAG, agents, evals, governance fluently
+* Notion database shows learning progression
+* System runs with zero manual intervention
+By end of Month 3:
+* 90+ concepts mastered
+* Consulting edge over competitors who don't have a structured learning system
+* Ready for Phase 2 features (spaced repetition, difficulty adaptation, compare concepts)

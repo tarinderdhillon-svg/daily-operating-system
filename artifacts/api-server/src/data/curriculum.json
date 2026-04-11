@@ -1,0 +1,196 @@
+{
+  "concepts": [
+    {
+      "name": "Supervised Learning",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "supervised-learning"
+    },
+    {
+      "name": "Embeddings",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "embeddings"
+    },
+    {
+      "name": "Transformer Architecture",
+      "category": "Foundations",
+      "difficulty": "Intermediate",
+      "slug": "transformer-architecture"
+    },
+    {
+      "name": "Attention Mechanism",
+      "category": "Foundations",
+      "difficulty": "Intermediate",
+      "slug": "attention-mechanism"
+    },
+    {
+      "name": "Gradient Descent",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "gradient-descent"
+    },
+    {
+      "name": "Transfer Learning",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "transfer-learning"
+    },
+    {
+      "name": "Neural Network Fundamentals",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "neural-network-fundamentals"
+    },
+    {
+      "name": "Overfitting and Regularization",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "overfitting-regularization"
+    },
+    {
+      "name": "Cross-Validation",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "cross-validation"
+    },
+    {
+      "name": "Feature Engineering",
+      "category": "Foundations",
+      "difficulty": "Intermediate",
+      "slug": "feature-engineering"
+    },
+    {
+      "name": "Reinforcement Learning",
+      "category": "Foundations",
+      "difficulty": "Intermediate",
+      "slug": "reinforcement-learning"
+    },
+    {
+      "name": "Unsupervised Learning",
+      "category": "Foundations",
+      "difficulty": "Beginner",
+      "slug": "unsupervised-learning"
+    },
+    {
+      "name": "Tokenization",
+      "category": "LLM-GenAI",
+      "difficulty": "Beginner",
+      "slug": "tokenization"
+    },
+    {
+      "name": "Retrieval-Augmented Generation (RAG)",
+      "category": "LLM-GenAI",
+      "difficulty": "Intermediate",
+      "slug": "rag"
+    },
+    {
+      "name": "Function Calling",
+      "category": "LLM-GenAI",
+      "difficulty": "Intermediate",
+      "slug": "function-calling"
+    },
+    {
+      "name": "LLM Evals",
+      "category": "LLM-GenAI",
+      "difficulty": "Intermediate",
+      "slug": "llm-evals"
+    },
+    {
+      "name": "Hallucinations and Grounding",
+      "category": "LLM-GenAI",
+      "difficulty": "Beginner",
+      "slug": "hallucinations-grounding"
+    },
+    {
+      "name": "Structured Outputs",
+      "category": "LLM-GenAI",
+      "difficulty": "Intermediate",
+      "slug": "structured-outputs"
+    },
+    {
+      "name": "Prompt Engineering",
+      "category": "LLM-GenAI",
+      "difficulty": "Beginner",
+      "slug": "prompt-engineering"
+    },
+    {
+      "name": "Chain-of-Thought Prompting",
+      "category": "LLM-GenAI",
+      "difficulty": "Beginner",
+      "slug": "chain-of-thought"
+    },
+    {
+      "name": "RLHF and Fine-Tuning",
+      "category": "LLM-GenAI",
+      "difficulty": "Intermediate",
+      "slug": "rlhf-fine-tuning"
+    },
+    {
+      "name": "Context Windows and Long Context",
+      "category": "LLM-GenAI",
+      "difficulty": "Beginner",
+      "slug": "context-windows"
+    },
+    {
+      "name": "System Prompts and Personas",
+      "category": "LLM-GenAI",
+      "difficulty": "Beginner",
+      "slug": "system-prompts"
+    },
+    {
+      "name": "AI Agents",
+      "category": "Modern Trends",
+      "difficulty": "Intermediate",
+      "slug": "ai-agents"
+    },
+    {
+      "name": "Multimodal AI",
+      "category": "Modern Trends",
+      "difficulty": "Intermediate",
+      "slug": "multimodal-ai"
+    },
+    {
+      "name": "Computer Use and Browser Automation",
+      "category": "Modern Trends",
+      "difficulty": "Intermediate",
+      "slug": "computer-use"
+    },
+    {
+      "name": "Model Routing and Cascades",
+      "category": "Modern Trends",
+      "difficulty": "Intermediate",
+      "slug": "model-routing"
+    },
+    {
+      "name": "Mixture of Experts (MoE)",
+      "category": "Modern Trends",
+      "difficulty": "Advanced",
+      "slug": "mixture-of-experts"
+    },
+    {
+      "name": "AI Governance and Risk",
+      "category": "Enterprise",
+      "difficulty": "Beginner",
+      "slug": "ai-governance"
+    },
+    {
+      "name": "Measuring AI ROI",
+      "category": "Enterprise",
+      "difficulty": "Beginner",
+      "slug": "measuring-ai-roi"
+    },
+    {
+      "name": "AI Adoption Barriers",
+      "category": "Enterprise",
+      "difficulty": "Beginner",
+      "slug": "ai-adoption-barriers"
+    },
+    {
+      "name": "Human-in-the-Loop Design",
+      "category": "Enterprise",
+      "difficulty": "Intermediate",
+      "slug": "human-in-the-loop"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import calendarRouter from "./calendar";
 import briefingRouter from "./briefing";
 import chatRouter from "./chat";
 import transcribeRouter from "./transcribe";
+import learningRouter from "./learning";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use("/calendar", calendarRouter);
 router.use("/briefing", briefingRouter);
 router.use("/chat", chatRouter);
 router.use("/transcribe", transcribeRouter);
+router.use("/learning", learningRouter);
 
 export default router;
