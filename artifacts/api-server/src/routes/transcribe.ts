@@ -11,19 +11,24 @@ router.post("/", upload.single("audio"), async (req, res): Promise<void> => {
     return;
   }
 
-  const client = new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  });
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ success: false, error: "OpenAI API key not configured" });
+    return;
+  }
+
+  // Use your own OpenAI key directly (not Replit integrations proxy)
+  const client = new OpenAI({ apiKey });
 
   try {
-    const audioFile = await toFile(req.file.buffer, "recording.webm", {
+    const ext = req.file.mimetype?.includes("ogg") ? "ogg" : "webm";
+    const audioFile = await toFile(req.file.buffer, `recording.${ext}`, {
       type: req.file.mimetype || "audio/webm",
     });
 
     const transcription = await client.audio.transcriptions.create({
-      file: audioFile,
-      model: "whisper-1",
+      file:     audioFile,
+      model:    "whisper-1",   // only Whisper model available — already cheapest
       language: "en",
     });
 

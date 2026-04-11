@@ -1,14 +1,28 @@
 import { Router } from "express";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ProcessChatBody } from "@workspace/api-zod";
 
 const router = Router();
 
-const NOTION_API_KEY = "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";
-const NOTION_DB_ID = "3356990a287981128f2ffe49ada5e44f";
-const NOTION_VERSION = "2022-06-28";
+const NOTION_API_KEY  = "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";
+const NOTION_DB_ID    = "3356990a287981128f2ffe49ada5e44f";
+const NOTION_VERSION  = "2022-06-28";
+const GEMINI_MODEL    = "gemini-2.5-flash-lite";  // cheapest capable Gemini model
 
 const TODAY = () => new Date().toISOString().split("T")[0];
+
+function getGemini() {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({ model: GEMINI_MODEL });
+}
+
+async function geminiGenerate(prompt: string): Promise<string> {
+  const model = getGemini();
+  const result = await model.generateContent(prompt);
+  return result.response.text().trim();
+}
 
 const VALID_STATUSES: Record<string, string> = {
   "in progress":  "In progress",
@@ -55,27 +69,27 @@ async function getTasksFromNotion() {
       Status?: { status: { name: string } | null };
     };
     return {
-      id: page.id,
-      title: props?.Name?.title?.map((t) => t.plain_text).join("") ?? "",
+      id:       page.id,
+      title:    props?.Name?.title?.map((t) => t.plain_text).join("") ?? "",
       due_date: props?.["Due Date"]?.date?.start ?? null,
       priority: props?.Priority?.select?.name ?? null,
-      status: props?.Status?.status?.name ?? null,
+      status:   props?.Status?.status?.name ?? null,
     };
   });
 }
 
 interface TaskFields {
-  title: string | null;
+  title:    string | null;
   due_date: string | null;
   priority: string | null;
-  status: string | null;
-  notes: string | null;
+  status:   string | null;
+  notes:    string | null;
 }
 
 async function createNotionTask(fields: TaskFields) {
   const status = normaliseStatus(fields.status) ?? "Not started";
   const properties: Record<string, unknown> = {
-    Name: { title: [{ text: { content: fields.title ?? "Untitled Task" } }] },
+    Name:   { title: [{ text: { content: fields.title ?? "Untitled Task" } }] },
     Status: { status: { name: status } },
   };
   if (fields.due_date) properties["Due Date"] = { date: { start: fields.due_date } };
@@ -88,12 +102,12 @@ async function createNotionTask(fields: TaskFields) {
   return page.id;
 }
 
-async function extractTaskFields(client: OpenAI, message: string): Promise<TaskFields> {
+async function extractTaskFields(message: string): Promise<TaskFields> {
   const prompt = `Extract task details from this user message. Today is ${TODAY()}.
 
 Message: "${message}"
 
-Return ONLY valid JSON with exactly these fields:
+Return ONLY valid JSON with exactly these fields (no markdown, no code fences):
 {
   "title": "the task name, or null if not found",
   "due_date": "ISO date YYYY-MM-DD based on what the user says (e.g. '15th April 2026' → '2026-04-15'), or null",
@@ -106,18 +120,16 @@ Examples:
 - "in progress" or "status in progress" → "In progress"
 - "high priority" or "urgent" → "High" or "Urgent"
 - "due 15th April" or "due April 15" → "2026-04-15"
-- "notes: call John first" or "reminder to check the invoice" → populate notes field
-Only return the JSON object, no other text.`;
+- "notes: call John first" → populate notes field
+Return only the JSON object, no other text.`;
 
-  const res = await client.chat.completions.create({
-    model: "gpt-5-nano",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-  });
   try {
-    return JSON.parse(res.choices[0]?.message?.content ?? "{}");
+    let raw = await geminiGenerate(prompt);
+    // strip markdown code fences if present
+    raw = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
+    return JSON.parse(raw);
   } catch {
-    return { title: null, due_date: null, priority: null, status: null };
+    return { title: null, due_date: null, priority: null, status: null, notes: null };
   }
 }
 
@@ -131,29 +143,25 @@ router.post("/", async (req, res): Promise<void> => {
   const { message } = parsed.data;
   const lowerMsg = message.toLowerCase();
 
-  const client = new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  });
-
   try {
 
     // ─── COMPLETE A PENDING TASK ──────────────────────────────────────────────
     if (message.startsWith("__PENDING_TASK__|")) {
-      const parts = message.split("|");
+      const parts       = message.split("|");
       const contextJson = parts[1] ?? "{}";
       const userReply   = parts.slice(2).join("|").replace(/^user_reply:/, "").trim();
 
-      let existing: TaskFields = { title: null, due_date: null, priority: null, status: null };
+      let existing: TaskFields = { title: null, due_date: null, priority: null, status: null, notes: null };
       try { existing = JSON.parse(contextJson); } catch { /* ignore */ }
 
-      const supplement = await extractTaskFields(client, userReply);
+      const supplement = await extractTaskFields(userReply);
 
       const merged: TaskFields = {
         title:    existing.title    ?? supplement.title,
         due_date: existing.due_date ?? supplement.due_date,
         priority: existing.priority ?? supplement.priority,
         status:   existing.status   ?? supplement.status,
+        notes:    existing.notes    ?? supplement.notes,
       };
 
       if (userReply.toLowerCase().includes("skip")) {
@@ -167,17 +175,17 @@ router.post("/", async (req, res): Promise<void> => {
         return;
       }
 
-      // treat "none" / "skip" / "n/a" answers as explicitly filling the field
-      const isNoneAnswer = (v: string | null) => v && ["none", "n/a", "skip", "no notes", "no priority", "no status"].includes(v.toLowerCase().trim());
+      const isNoneAnswer = (v: string | null) =>
+        !!v && ["none", "n/a", "skip", "no notes", "no priority", "no status"].includes(v.toLowerCase().trim());
       if (isNoneAnswer(supplement.notes))    merged.notes    = "";
       if (isNoneAnswer(supplement.priority)) merged.priority = null;
       if (isNoneAnswer(supplement.status))   merged.status   = null;
 
-      const stillMissing = [];
-      if (!merged.due_date) stillMissing.push("due date");
-      if (!merged.priority) stillMissing.push("priority (Urgent, High, Medium, or Low)");
-      if (!merged.status)   stillMissing.push("status (Not started, In progress, or In Review)");
-      if (merged.notes === null) stillMissing.push("notes / any extra context (or say 'none')");
+      const stillMissing: string[] = [];
+      if (!merged.due_date)          stillMissing.push("due date");
+      if (!merged.priority)          stillMissing.push("priority (Urgent, High, Medium, or Low)");
+      if (!merged.status)            stillMissing.push("status (Not started, In progress, or In Review)");
+      if (merged.notes === null)     stillMissing.push("notes / any extra context (or say 'none')");
 
       if (stillMissing.length > 0) {
         res.json({
@@ -201,19 +209,19 @@ router.post("/", async (req, res): Promise<void> => {
 
     // ─── CREATE TASK ─────────────────────────────────────────────────────────
     if (
-      lowerMsg.includes("create task") ||
-      lowerMsg.includes("add task")    ||
-      lowerMsg.includes("new task")    ||
+      lowerMsg.includes("create task")   ||
+      lowerMsg.includes("add task")      ||
+      lowerMsg.includes("new task")      ||
       lowerMsg.includes("create a task")
     ) {
-      const extracted = await extractTaskFields(client, message);
+      const extracted = await extractTaskFields(message);
 
       if (!extracted.title) {
         res.json({
           success: true,
           response: "I'd like to create a task for you. What should I call it?",
           action_taken: "task_pending",
-          data: { title: null, due_date: null, priority: null, status: null, missing_fields: ["title", "due date", "priority", "status"] },
+          data: { title: null, due_date: null, priority: null, status: null, notes: null, missing_fields: ["title", "due date", "priority", "status"] },
         });
         return;
       }
@@ -246,8 +254,8 @@ router.post("/", async (req, res): Promise<void> => {
 
     // ─── SHOW TASKS ──────────────────────────────────────────────────────────
     if (lowerMsg.includes("show") && (lowerMsg.includes("task") || lowerMsg.includes("overdue") || lowerMsg.includes("outstanding") || lowerMsg.includes("to-do") || lowerMsg.includes("todo"))) {
-      const tasks = await getTasksFromNotion();
-      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const tasks   = await getTasksFromNotion();
+      const today   = new Date(); today.setHours(0, 0, 0, 0);
       const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
 
       let filtered = tasks;
@@ -290,7 +298,7 @@ router.post("/", async (req, res): Promise<void> => {
           today:    { date: string; events: Array<{ time: string; title: string; duration?: string }> };
           tomorrow: { date: string; events: Array<{ time: string; title: string; duration?: string }> };
         };
-        const day = isToday ? calData.today : calData.tomorrow;
+        const day      = isToday ? calData.today : calData.tomorrow;
         const dayLabel = isToday ? "today" : "tomorrow";
         const eventList = day.events.length > 0
           ? day.events.map((e) => `• ${e.time}: ${e.title}${e.duration ? ` (${e.duration})` : ""}`).join("\n")
@@ -318,8 +326,8 @@ router.post("/", async (req, res): Promise<void> => {
 
     // ─── PRIORITY ANALYSIS ───────────────────────────────────────────────────
     if (lowerMsg.includes("priority") || lowerMsg.includes("focus") || lowerMsg.includes("on track") || lowerMsg.includes("what should i")) {
-      const tasks = await getTasksFromNotion();
-      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const tasks    = await getTasksFromNotion();
+      const today    = new Date(); today.setHours(0, 0, 0, 0);
       const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
       const overdue     = tasks.filter((t: { due_date: string | null }) => t.due_date && new Date(t.due_date) < today);
       const outstanding = tasks.filter((t: { due_date: string | null }) => {
@@ -328,19 +336,15 @@ router.post("/", async (req, res): Promise<void> => {
         return d >= today && d <= nextWeek;
       });
 
-      const aiResponse = await client.chat.completions.create({
-        model: "gpt-5-nano",
-        messages: [{
-          role: "user",
-          content: `You are a daily operating system assistant for Tarinder.
+      const analysisPrompt = `You are a daily operating system assistant for Tarinder.
 Overdue tasks (${overdue.length}): ${overdue.map((t: { title: string }) => t.title).join(", ") || "none"}
 Due this week (${outstanding.length}): ${outstanding.map((t: { title: string }) => t.title).join(", ") || "none"}
-Give a concise, actionable focus recommendation in 2-3 sentences. Be direct and professional.`,
-        }],
-      });
+Give a concise, actionable focus recommendation in 2-3 sentences. Be direct and professional.`;
+
+      const aiText = await geminiGenerate(analysisPrompt);
       res.json({
         success: true,
-        response: aiResponse.choices[0]?.message?.content ?? "Focus on your highest-priority tasks first.",
+        response: aiText || "Focus on your highest-priority tasks first.",
         action_taken: "priority_analysis",
         data: { overdue_count: overdue.length, outstanding_count: outstanding.length },
       });
@@ -348,23 +352,16 @@ Give a concise, actionable focus recommendation in 2-3 sentences. Be direct and 
     }
 
     // ─── GENERAL AI FALLBACK ─────────────────────────────────────────────────
-    const aiResponse = await client.chat.completions.create({
-      model: "gpt-5-nano",
-      messages: [
-        {
-          role: "system",
-          content: `You are Tarinder's daily operating system assistant. Help manage tasks (create, update, delete), check schedules, and explain priorities. Be concise, professional, and actionable. Keep responses under 150 words.
+    const systemContext = `You are Tarinder's daily operating system assistant. Help manage tasks (create, update, delete), check schedules, and explain priorities. Be concise, professional, and actionable. Keep responses under 150 words.
 
 To create a task say: "create task [name] due [date] priority [level] status [status]"
 To see tasks say: "show my tasks" or "show overdue tasks"
-To check schedule say: "what's on today" or "show tomorrow"`,
-        },
-        { role: "user", content: message },
-      ],
-    });
+To check schedule say: "what's on today" or "show tomorrow"`;
+
+    const aiText = await geminiGenerate(`${systemContext}\n\nUser: ${message}`);
     res.json({
       success: true,
-      response: aiResponse.choices[0]?.message?.content ?? "I'm here to help. Try asking me to create a task, show your schedule, or generate your daily briefing.",
+      response: aiText || "I'm here to help. Try asking me to create a task, show your schedule, or generate your daily briefing.",
       action_taken: null,
       data: null,
     });

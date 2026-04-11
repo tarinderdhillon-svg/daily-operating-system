@@ -1,8 +1,17 @@
 import { Router } from "express";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { logger } from "../lib/logger";
 
 const router = Router();
+
+const GEMINI_MODEL = "gemini-2.5-flash-lite";  // cheapest capable Gemini model
+
+function getGemini() {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({ model: GEMINI_MODEL });
+}
 
 interface CachedBriefing {
   generated_at: string;
@@ -40,21 +49,18 @@ const BUSINESS_TOPICS = [
 ];
 
 async function generateArticle(
-  client: OpenAI,
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   topic: string,
   category: string,
 ): Promise<BriefingArticle> {
   const today = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    year: "numeric", month: "long", day: "numeric",
   });
 
   const sources: Record<string, string[]> = {
-    tech: ["TechCrunch", "The Verge", "Wired", "MIT Technology Review", "ArXiv", "Ars Technica"],
+    tech:     ["TechCrunch", "The Verge", "Wired", "MIT Technology Review", "ArXiv", "Ars Technica"],
     business: ["Financial Times", "Bloomberg", "The Economist", "McKinsey Insights", "Wall Street Journal", "Reuters"],
   };
-
   const sourceList = category === "tech" ? sources.tech : sources.business;
   const source = sourceList[Math.floor(Math.random() * sourceList.length)];
 
@@ -62,7 +68,7 @@ async function generateArticle(
 
 Today's date: ${today}
 
-Return ONLY valid JSON with this exact structure:
+Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
 {
   "title": "compelling headline (under 80 chars)",
   "summary": "2-3 sentences covering the key development, business impact, and implications for professionals",
@@ -72,43 +78,43 @@ Return ONLY valid JSON with this exact structure:
 
 Make the content feel current, specific, and professionally written. Include realistic-sounding data points where relevant.`;
 
-  const response = await client.chat.completions.create({
-    model: "gpt-5-nano",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-  });
-
-  const content = response.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(content);
-
-  return {
-    title: parsed.title ?? `Latest developments in ${topic}`,
-    source,
-    date: today,
-    summary: parsed.summary ?? "Summary unavailable.",
-    key_metrics: parsed.key_metrics ?? null,
-    link: parsed.link ?? "https://techcrunch.com",
-  };
+  try {
+    const result  = await model.generateContent(prompt);
+    let raw = result.response.text().trim();
+    // strip markdown code fences if present
+    raw = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
+    const parsed = JSON.parse(raw);
+    return {
+      title:       parsed.title       ?? `Latest developments in ${topic}`,
+      source,
+      date:        today,
+      summary:     parsed.summary     ?? "Summary unavailable.",
+      key_metrics: parsed.key_metrics ?? null,
+      link:        parsed.link        ?? "https://techcrunch.com",
+    };
+  } catch {
+    return {
+      title:       `Latest developments in ${topic}`,
+      source,
+      date:        today,
+      summary:     "Unable to generate summary at this time.",
+      key_metrics: null,
+      link:        "https://techcrunch.com",
+    };
+  }
 }
 
 async function buildBriefing(): Promise<CachedBriefing> {
-  const client = new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  });
+  const model = getGemini();
 
   const [aiArticles, businessArticles] = await Promise.all([
-    Promise.all(
-      AI_TECH_TOPICS.map((topic) => generateArticle(client, topic, "tech")),
-    ),
-    Promise.all(
-      BUSINESS_TOPICS.map((topic) => generateArticle(client, topic, "business")),
-    ),
+    Promise.all(AI_TECH_TOPICS.map((topic) => generateArticle(model, topic, "tech"))),
+    Promise.all(BUSINESS_TOPICS.map((topic) => generateArticle(model, topic, "business"))),
   ]);
 
   return {
-    generated_at: new Date().toISOString(),
-    ai_tech: aiArticles,
+    generated_at:     new Date().toISOString(),
+    ai_tech:          aiArticles,
     business_markets: businessArticles,
   };
 }
@@ -118,13 +124,12 @@ router.get("/", async (req, res): Promise<void> => {
     res.json({ success: true, briefing: cachedBriefing });
     return;
   }
-
   res.json({ success: true, briefing: null });
 });
 
 router.post("/", async (req, res): Promise<void> => {
   try {
-    req.log.info("Generating daily briefing...");
+    req.log.info("Generating daily briefing with Gemini...");
     cachedBriefing = await buildBriefing();
     req.log.info("Briefing generated successfully");
     res.json({ success: true, briefing: cachedBriefing });
