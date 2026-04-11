@@ -63,24 +63,30 @@ async function notionRequest(
   return json;
 }
 
+const DONE_STATUSES = new Set(["done", "complete", "completed"]);
+
 router.get("/", async (req, res): Promise<void> => {
   try {
     const data = await notionRequest(`/databases/${NOTION_DB_ID}/query`, "POST", {
       page_size: 100,
+      sorts: [{ property: "Due Date", direction: "ascending" }],
     });
 
-    const tasks = (data.results as NotionTask[]).map(parseTask);
+    const allTasks = (data.results as NotionTask[]).map(parseTask);
+
+    const completed = allTasks.filter(t => DONE_STATUSES.has((t.status ?? "").toLowerCase()));
+    const activeTasks = allTasks.filter(t => !DONE_STATUSES.has((t.status ?? "").toLowerCase()));
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
 
-    const overdue: typeof tasks = [];
-    const outstanding: typeof tasks = [];
-    const todo: typeof tasks = [];
+    const overdue: typeof activeTasks = [];
+    const outstanding: typeof activeTasks = [];
+    const todo: typeof activeTasks = [];
 
-    for (const task of tasks) {
+    for (const task of activeTasks) {
       if (!task.due_date) {
         todo.push(task);
         continue;
@@ -99,8 +105,9 @@ router.get("/", async (req, res): Promise<void> => {
     res.json(
       GetTasksResponse.parse({
         success: true,
-        tasks,
+        tasks: activeTasks,
         categorized: { overdue, outstanding, todo },
+        completed,
       }),
     );
   } catch (err) {

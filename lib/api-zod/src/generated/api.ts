@@ -57,6 +57,15 @@ export const GetTasksResponse = zod.object({
       }),
     ),
   }),
+  completed: zod.array(
+    zod.object({
+      id: zod.string(),
+      title: zod.string(),
+      due_date: zod.string().nullish(),
+      priority: zod.enum(["High", "Medium", "Low"]).nullish(),
+      status: zod.string().nullish(),
+    }),
+  ).optional(),
 });
 
 /**
