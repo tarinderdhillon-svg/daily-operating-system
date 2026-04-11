@@ -138,9 +138,11 @@ export function ChatPanel() {
       const res = await fetch("/api/transcribe", { method: "POST", body: formData });
       const data = await res.json() as { success: boolean; text?: string; error?: string };
 
-      if (data.success && data.text) {
-        setInput(prev => (prev ? prev + " " + data.text : data.text!));
-        setTimeout(() => textareaRef.current?.focus(), 50);
+      if (data.success && data.text?.trim()) {
+        // Auto-send the transcribed text immediately
+        sendMessage(data.text.trim());
+      } else if (data.success && !data.text?.trim()) {
+        setVoiceError("No speech detected. Please try again.");
       } else {
         setVoiceError("Could not transcribe audio. Please try again or type your message.");
       }

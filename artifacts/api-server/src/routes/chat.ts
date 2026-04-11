@@ -4,10 +4,12 @@ import { ProcessChatBody } from "@workspace/api-zod";
 
 const router = Router();
 
-const NOTION_API_KEY  = "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";
-const NOTION_DB_ID    = "3356990a287981128f2ffe49ada5e44f";
-const NOTION_VERSION  = "2022-06-28";
-const GEMINI_MODEL    = "gemini-2.5-flash-lite";  // cheapest capable Gemini model
+const NOTION_API_KEY    = "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";
+const NOTION_DB_ID      = "3356990a287981128f2ffe49ada5e44f";
+const NOTION_PROJECTS_DB = "3356990a-2879-8110-9d8f-db6ed7291219";
+const NOTION_VERSION    = "2022-06-28";
+const GEMINI_MODEL      = "gemini-2.5-flash-lite";  // cheapest capable Gemini model
+const DHILLON_USER_ID   = "335d872b-594c-8135-92ba-0002f74d1f33";
 
 const TODAY = () => new Date().toISOString().split("T")[0];
 
@@ -79,11 +81,43 @@ async function getTasksFromNotion() {
 }
 
 interface TaskFields {
-  title:    string | null;
-  due_date: string | null;
-  priority: string | null;
-  status:   string | null;
-  notes:    string | null;
+  title:           string | null;
+  due_date:        string | null;
+  priority:        string | null;
+  status:          string | null;
+  notes:           string | null;
+  related_project: string | null;  // project name, resolved to page ID at creation time
+}
+
+// Known projects cache (name → page ID)
+let projectsCache: Record<string, string> | null = null;
+
+async function getProjects(): Promise<Record<string, string>> {
+  if (projectsCache) return projectsCache;
+  try {
+    const data = await notionRequest(`/databases/${NOTION_PROJECTS_DB}/query`, "POST", { page_size: 50 });
+    const map: Record<string, string> = {};
+    for (const page of data.results as Array<{ id: string; properties: Record<string, unknown> }>) {
+      const props = page.properties as { Name?: { title: Array<{ plain_text: string }> } };
+      const name = props?.Name?.title?.map((t) => t.plain_text).join("").trim();
+      if (name) map[name.toLowerCase()] = page.id;
+    }
+    projectsCache = map;
+    return map;
+  } catch {
+    // If projects DB is unavailable, return known defaults (populated on first success)
+    return {};
+  }
+}
+
+async function resolveProjectId(name: string | null): Promise<string | null> {
+  if (!name) return null;
+  const projects = await getProjects();
+  // exact match first, then partial
+  const lower = name.toLowerCase().trim();
+  if (projects[lower]) return projects[lower];
+  const key = Object.keys(projects).find(k => k.includes(lower) || lower.includes(k));
+  return key ? projects[key] : null;
 }
 
 async function createNotionTask(fields: TaskFields) {
@@ -91,10 +125,15 @@ async function createNotionTask(fields: TaskFields) {
   const properties: Record<string, unknown> = {
     Name:   { title: [{ text: { content: fields.title ?? "Untitled Task" } }] },
     Status: { status: { name: status } },
+    Owner:  { people: [{ id: DHILLON_USER_ID }] },
   };
   if (fields.due_date) properties["Due Date"] = { date: { start: fields.due_date } };
   if (fields.priority) properties["Priority"] = { select: { name: fields.priority } };
   if (fields.notes)    properties["Notes"]    = { rich_text: [{ text: { content: fields.notes } }] };
+
+  const projectId = await resolveProjectId(fields.related_project);
+  if (projectId) properties["Related Project"] = { relation: [{ id: projectId }] };
+
   const page = await notionRequest("/pages", "POST", {
     parent: { database_id: NOTION_DB_ID },
     properties,
@@ -113,7 +152,8 @@ Return ONLY valid JSON with exactly these fields (no markdown, no code fences):
   "due_date": "ISO date YYYY-MM-DD based on what the user says (e.g. '15th April 2026' → '2026-04-15'), or null",
   "priority": "Urgent, High, Medium, or Low exactly, or null if not mentioned",
   "status": "In progress, Not started, or In Review exactly (map user's words), or null if not mentioned",
-  "notes": "any extra context, description, or notes about the task, or null"
+  "notes": "any extra context, description, or notes about the task, or null",
+  "related_project": "one of: Day-to-Day Life, Navaigate, Work, L&D — only if explicitly mentioned, otherwise null"
 }
 
 Examples:
@@ -121,15 +161,16 @@ Examples:
 - "high priority" or "urgent" → "High" or "Urgent"
 - "due 15th April" or "due April 15" → "2026-04-15"
 - "notes: call John first" → populate notes field
+- "for work project" → "Work", "for L&D" → "L&D", "navaigate task" → "Navaigate"
 Return only the JSON object, no other text.`;
 
   try {
     let raw = await geminiGenerate(prompt);
-    // strip markdown code fences if present
     raw = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    return { ...parsed, related_project: parsed.related_project ?? null };
   } catch {
-    return { title: null, due_date: null, priority: null, status: null, notes: null };
+    return { title: null, due_date: null, priority: null, status: null, notes: null, related_project: null };
   }
 }
 
@@ -157,11 +198,12 @@ router.post("/", async (req, res): Promise<void> => {
       const supplement = await extractTaskFields(userReply);
 
       const merged: TaskFields = {
-        title:    existing.title    ?? supplement.title,
-        due_date: existing.due_date ?? supplement.due_date,
-        priority: existing.priority ?? supplement.priority,
-        status:   existing.status   ?? supplement.status,
-        notes:    existing.notes    ?? supplement.notes,
+        title:           existing.title           ?? supplement.title,
+        due_date:        existing.due_date        ?? supplement.due_date,
+        priority:        existing.priority        ?? supplement.priority,
+        status:          existing.status          ?? supplement.status,
+        notes:           existing.notes           ?? supplement.notes,
+        related_project: existing.related_project ?? supplement.related_project,
       };
 
       if (userReply.toLowerCase().includes("skip")) {
@@ -176,16 +218,24 @@ router.post("/", async (req, res): Promise<void> => {
       }
 
       const isNoneAnswer = (v: string | null) =>
-        !!v && ["none", "n/a", "skip", "no notes", "no priority", "no status"].includes(v.toLowerCase().trim());
-      if (isNoneAnswer(supplement.notes))    merged.notes    = "";
-      if (isNoneAnswer(supplement.priority)) merged.priority = null;
-      if (isNoneAnswer(supplement.status))   merged.status   = null;
+        !!v && ["none", "n/a", "skip", "no notes", "no priority", "no status", "no project"].includes(v.toLowerCase().trim());
+
+      // also catch raw-text "notes none / no notes / notes n/a" etc.
+      const replyLower = userReply.toLowerCase();
+      const rawNoneNotes   = /\bnotes?\s*:?\s*(none|n\/a|no|nothing|skip)\b/.test(replyLower);
+      const rawNoneProject = /\b(no project|project\s*:?\s*(none|n\/a|no|nothing|skip)|none\s+project)\b/.test(replyLower);
+
+      if (isNoneAnswer(supplement.notes)    || rawNoneNotes)    merged.notes           = "";
+      if (isNoneAnswer(supplement.priority))                    merged.priority        = null;
+      if (isNoneAnswer(supplement.status))                      merged.status          = null;
+      if (isNoneAnswer(supplement.related_project) || rawNoneProject) merged.related_project = "";
 
       const stillMissing: string[] = [];
-      if (!merged.due_date)          stillMissing.push("due date");
-      if (!merged.priority)          stillMissing.push("priority (Urgent, High, Medium, or Low)");
-      if (!merged.status)            stillMissing.push("status (Not started, In progress, or In Review)");
-      if (merged.notes === null)     stillMissing.push("notes / any extra context (or say 'none')");
+      if (!merged.due_date)              stillMissing.push("due date");
+      if (!merged.priority)              stillMissing.push("priority (Urgent, High, Medium, or Low)");
+      if (!merged.status)                stillMissing.push("status (Not started, In progress, or In Review)");
+      if (merged.notes === null)         stillMissing.push("notes / any extra context (or say 'none')");
+      if (merged.related_project === null) stillMissing.push("related project (Day-to-Day Life, Navaigate, Work, L&D — or say 'none')");
 
       if (stillMissing.length > 0) {
         res.json({
@@ -227,10 +277,11 @@ router.post("/", async (req, res): Promise<void> => {
       }
 
       const missing: string[] = [];
-      if (!extracted.due_date) missing.push("due date");
-      if (!extracted.priority) missing.push("priority (Urgent, High, Medium, or Low)");
-      if (!extracted.status)   missing.push("status (Not started, In progress, or In Review)");
-      if (!extracted.notes)    missing.push("notes / any extra context (or say 'none')");
+      if (!extracted.due_date)              missing.push("due date");
+      if (!extracted.priority)              missing.push("priority (Urgent, High, Medium, or Low)");
+      if (!extracted.status)                missing.push("status (Not started, In progress, or In Review)");
+      if (!extracted.notes)                 missing.push("notes / any extra context (or say 'none')");
+      if (extracted.related_project === null) missing.push("related project (Day-to-Day Life, Navaigate, Work, L&D — or say 'none')");
 
       if (missing.length > 0) {
         res.json({
