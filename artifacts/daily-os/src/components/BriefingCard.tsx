@@ -1,111 +1,210 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useGetBriefing, useGenerateBriefing, getGetBriefingQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Zap, TrendingUp, RefreshCw, ExternalLink } from "lucide-react";
+import { Sparkles, TrendingUp, Zap, RefreshCw, ExternalLink, ChevronDown, ChevronUp, Badge as BadgeIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 export function BriefingCard() {
   const { data: briefingResponse, isLoading } = useGetBriefing();
   const generateBriefing = useGenerateBriefing();
   const queryClient = useQueryClient();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleGenerate = () => {
     generateBriefing.mutate(undefined, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetBriefingQueryKey() })
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetBriefingQueryKey() }),
     });
   };
 
   if (isLoading) {
-    return <div className="glass-card rounded-2xl p-6 h-[400px] animate-pulse mb-6" />;
+    return (
+      <div className="bento-card rounded-3xl p-6 h-[88px] animate-pulse" />
+    );
   }
 
   const briefing = briefingResponse?.briefing;
 
   if (!briefing) {
     return (
-      <div className="glass-card rounded-2xl p-8 flex flex-col items-center justify-center text-center mb-6">
-        <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
-          <Zap className="text-blue-400" size={32} />
+      <div className="bento-card rounded-3xl p-6 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+            <Sparkles className="h-4 w-4 text-indigo-400" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
+              Daily Briefing
+              <span className="text-[10px] font-medium bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full">AI Generated</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">No briefing yet — generate one to get started</p>
+          </div>
         </div>
-        <h3 className="text-lg font-medium text-slate-200 mb-2">No Briefing Available</h3>
-        <p className="text-sm text-slate-400 mb-6 max-w-sm">Generate your daily intelligence briefing to get the latest tech news and market updates tailored for you.</p>
-        <button 
+        <button
           onClick={handleGenerate}
           disabled={generateBriefing.isPending}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-xl font-medium transition-all disabled:opacity-50 flex items-center gap-2"
+          className="shrink-0 bg-indigo-600/80 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-50 flex items-center gap-1.5"
         >
-          {generateBriefing.isPending ? <RefreshCw className="animate-spin" size={18} /> : <Zap size={18} />}
-          Generate Briefing
+          {generateBriefing.isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+          {generateBriefing.isPending ? "Generating…" : "Generate"}
         </button>
       </div>
     );
   }
 
-  const renderSection = (title: string, articles: any[], icon: React.ReactNode, accentColor: string) => (
-    <div className="flex-1">
-      <h3 className={`text-sm font-semibold tracking-wider uppercase mb-4 flex items-center gap-2 ${accentColor}`}>
-        {icon} {title}
-      </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {articles.map((article, i) => (
-          <a 
-            key={i} 
-            href={article.link}
-            target="_blank"
-            rel="noreferrer"
-            className="group bg-slate-800/40 hover:bg-slate-800/80 border border-white/5 hover:border-white/10 rounded-xl p-4 transition-all flex flex-col h-full"
-          >
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-blue-400 transition-colors line-clamp-2">
-                {article.title}
-              </h4>
-              <ExternalLink size={14} className="text-slate-500 opacity-0 group-hover:opacity-100 flex-shrink-0" />
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono uppercase tracking-wider mb-2">
-              {article.source} • {article.date}
-            </div>
-            <p className="text-xs text-slate-400 flex-1 line-clamp-3 mb-3">
-              {article.summary}
-            </p>
-            {article.key_metrics && (
-              <div className="mt-auto inline-flex px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-xs font-mono text-blue-300">
-                {article.key_metrics}
-              </div>
-            )}
-          </a>
-        ))}
-      </div>
-    </div>
-  );
+  const topAiTech = briefing.ai_tech?.[0];
+  const topBusiness = briefing.business_markets?.[0];
 
   return (
-    <div className="glass-card rounded-2xl p-6 mb-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg">
-            <Zap className="text-white" size={20} />
+    <div className="bento-card rounded-3xl overflow-hidden relative group hover:border-indigo-500/30 transition-colors">
+      {/* Corner glow */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-purple-500/0 blur-2xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+
+      {/* Header row — always visible */}
+      <div className="flex items-start gap-3 p-5 pb-4 relative">
+        <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 mt-0.5">
+          <Sparkles className="h-4 w-4 text-indigo-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider">Daily Briefing</h2>
+            <span className="text-[10px] font-medium bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full">AI Generated</span>
+            <span className="text-[10px] text-slate-500 ml-1">
+              {format(parseISO(briefing.generated_at), "h:mm a")}
+            </span>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-100 leading-tight">Daily Intelligence</h2>
-            <div className="text-xs text-slate-400">
-              Updated {format(parseISO(briefing.generated_at), 'h:mm a')}
+
+          {/* Collapsed summary: show first headline from each category */}
+          {!isExpanded && (
+            <div className="flex flex-col md:flex-row gap-2 mt-2">
+              {topAiTech && (
+                <a
+                  href={topAiTech.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 flex items-start gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors group/link"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <Zap className="h-3 w-3 text-indigo-400 shrink-0 mt-0.5" />
+                  <span className="line-clamp-1 group-hover/link:text-indigo-300">
+                    <span className="text-indigo-400/70 font-medium">AI/Tech: </span>{topAiTech.title}
+                  </span>
+                </a>
+              )}
+              {topBusiness && (
+                <a
+                  href={topBusiness.link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 flex items-start gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors group/link"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <TrendingUp className="h-3 w-3 text-emerald-400 shrink-0 mt-0.5" />
+                  <span className="line-clamp-1 group-hover/link:text-emerald-300">
+                    <span className="text-emerald-400/70 font-medium">Markets: </span>{topBusiness.title}
+                  </span>
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleGenerate}
+            disabled={generateBriefing.isPending}
+            title="Refresh briefing"
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-slate-300 transition-all disabled:opacity-40"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${generateBriefing.isPending ? "animate-spin text-indigo-400" : ""}`} />
+          </button>
+          <button
+            onClick={() => setIsExpanded(v => !v)}
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-indigo-300 transition-all flex items-center gap-1 text-xs font-medium px-2"
+          >
+            {isExpanded ? (
+              <><ChevronUp className="h-3.5 w-3.5" /> Collapse</>
+            ) : (
+              <><ChevronDown className="h-3.5 w-3.5" /> Read full briefing</>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded full briefing */}
+      {isExpanded && (
+        <div className="px-5 pb-6 border-t border-white/[0.04] pt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* AI & Tech */}
+            <div>
+              <h3 className="text-xs font-bold tracking-widest uppercase text-indigo-400 mb-3 flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5" /> AI & Technology
+              </h3>
+              <div className="space-y-3">
+                {briefing.ai_tech.map((article: any, i: number) => (
+                  <a
+                    key={i}
+                    href={article.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group block bg-white/[0.02] hover:bg-indigo-500/5 border border-white/[0.05] hover:border-indigo-500/20 rounded-2xl p-3.5 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-indigo-300 transition-colors line-clamp-2">
+                        {article.title}
+                      </h4>
+                      <ExternalLink className="h-3.5 w-3.5 text-slate-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-2">
+                      {article.source} · {article.date}
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2">{article.summary}</p>
+                    {article.key_metrics && (
+                      <div className="mt-2 inline-flex px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-mono text-indigo-300">
+                        {article.key_metrics}
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Business & Markets */}
+            <div>
+              <h3 className="text-xs font-bold tracking-widest uppercase text-emerald-400 mb-3 flex items-center gap-2">
+                <TrendingUp className="h-3.5 w-3.5" /> Business & Markets
+              </h3>
+              <div className="space-y-3">
+                {briefing.business_markets.map((article: any, i: number) => (
+                  <a
+                    key={i}
+                    href={article.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group block bg-white/[0.02] hover:bg-emerald-500/5 border border-white/[0.05] hover:border-emerald-500/20 rounded-2xl p-3.5 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h4 className="text-sm font-semibold text-slate-200 leading-snug group-hover:text-emerald-300 transition-colors line-clamp-2">
+                        {article.title}
+                      </h4>
+                      <ExternalLink className="h-3.5 w-3.5 text-slate-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-opacity" />
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-2">
+                      {article.source} · {article.date}
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2">{article.summary}</p>
+                    {article.key_metrics && (
+                      <div className="mt-2 inline-flex px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-300">
+                        {article.key_metrics}
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-        <button 
-          onClick={handleGenerate}
-          disabled={generateBriefing.isPending}
-          className="bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50 flex items-center gap-2"
-        >
-          <RefreshCw className={generateBriefing.isPending ? "animate-spin text-blue-400" : ""} size={16} />
-          {generateBriefing.isPending ? "Updating..." : "Refresh"}
-        </button>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-8">
-        {renderSection("AI & Tech", briefing.ai_tech, <Zap size={16} />, "text-indigo-400")}
-        {renderSection("Business & Markets", briefing.business_markets, <TrendingUp size={16} />, "text-emerald-400")}
-      </div>
+      )}
     </div>
   );
 }

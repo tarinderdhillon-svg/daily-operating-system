@@ -119,8 +119,28 @@ async function buildBriefing(): Promise<CachedBriefing> {
   };
 }
 
+function isBriefingStale(briefing: CachedBriefing): boolean {
+  const now = new Date();
+  const generated = new Date(briefing.generated_at);
+
+  // Different calendar day → always stale
+  if (generated.toDateString() !== now.toDateString()) return true;
+
+  // Same day: stale if current time is past 05:30 but briefing was generated before 05:30
+  const cutoff = new Date(now);
+  cutoff.setHours(5, 30, 0, 0);
+  return now >= cutoff && generated < cutoff;
+}
+
 router.get("/", async (req, res): Promise<void> => {
   if (cachedBriefing) {
+    // Auto-refresh in background if stale (past 05:30 and not yet refreshed today)
+    if (isBriefingStale(cachedBriefing)) {
+      req.log.info("Briefing is stale — triggering background refresh for 05:30 schedule");
+      buildBriefing()
+        .then(b => { cachedBriefing = b; })
+        .catch(err => req.log.error({ err }, "Background briefing refresh failed"));
+    }
     res.json({ success: true, briefing: cachedBriefing });
     return;
   }

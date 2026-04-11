@@ -1,5 +1,5 @@
 import { useGetCalendar } from "@workspace/api-client-react";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Clock } from "lucide-react";
 import { parseISO, format, isValid } from "date-fns";
 
 function safeFormatDate(dateStr: string, fmt: string, fallback = ""): string {
@@ -15,45 +15,47 @@ export function CalendarCard() {
   const { data: calendarResponse, isLoading } = useGetCalendar();
 
   if (isLoading) {
-    return <div className="glass-card rounded-2xl p-6 h-[300px] animate-pulse mb-6" />;
+    return <div className="bento-card rounded-3xl p-6 h-[180px] animate-pulse" />;
   }
 
-  const renderDay = (day: { date: string; events: Array<{ time: string; title: string; duration?: string | null }> } | undefined, isToday: boolean) => (
-    <div className={`flex-1 ${isToday ? "border-r border-white/10 pr-6" : "pl-6"}`}>
-      <h3 className="text-sm font-semibold tracking-wider uppercase text-slate-400 mb-4 flex items-center justify-between">
-        <span>{isToday ? "Today" : "Tomorrow"}</span>
+  const renderDay = (
+    day: { date: string; events: Array<{ time: string; title: string; duration?: string | null }> } | undefined,
+    isToday: boolean,
+  ) => (
+    <div className={`flex-1 ${isToday ? "border-r border-white/[0.06] pr-5" : "pl-5"}`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className={`text-xs font-bold tracking-widest uppercase ${isToday ? "text-indigo-400" : "text-slate-500"}`}>
+          {isToday ? "Today" : "Tomorrow"}
+        </h3>
         {day?.date && (
-          <span className="text-xs text-slate-500">
+          <span className="text-[10px] text-slate-600 font-mono">
             {safeFormatDate(day.date, "MMM d")}
           </span>
         )}
-      </h3>
+      </div>
 
       {!day || !day.events || day.events.length === 0 ? (
-        <div className="text-sm text-slate-500 italic py-4 flex flex-col items-center justify-center gap-2 border border-dashed border-white/10 rounded-xl bg-white/5">
-          <CalendarIcon size={20} className="opacity-50" />
+        <div className="flex items-center gap-2 text-xs text-slate-600 py-3 px-3 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+          <CalendarIcon className="h-3.5 w-3.5 opacity-50" />
           No events scheduled
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col md:flex-row gap-2.5">
           {day.events.map((event, i) => (
             <div
               key={i}
-              className="group flex gap-3 p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 border border-transparent hover:border-white/5 transition-all"
+              className="flex-1 group flex gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.06] hover:border-indigo-500/20 transition-all relative overflow-hidden"
             >
-              <div className="flex flex-col items-end min-w-[60px] text-xs font-mono text-slate-400 mt-0.5">
-                <span className="text-slate-300">{event.time}</span>
-                {event.duration && (
-                  <span className="text-[10px] text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {event.duration}
-                  </span>
-                )}
-              </div>
-              <div className="w-[2px] bg-blue-500/30 rounded-full relative">
-                <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-slate-200 font-medium leading-tight">{event.title}</p>
+              <div className="absolute top-0 left-0 w-0.5 h-full bg-indigo-500/50 rounded-full" />
+              <div className="pl-1 flex flex-col gap-0.5 min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-[10px] text-slate-500 font-mono mb-0.5">
+                  <Clock className="h-3 w-3 text-indigo-400/60" />
+                  {event.time}
+                  {event.duration && (
+                    <span className="text-slate-600"> · {event.duration}</span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-200 font-medium leading-snug truncate">{event.title}</p>
               </div>
             </div>
           ))}
@@ -63,10 +65,13 @@ export function CalendarCard() {
   );
 
   return (
-    <div className="glass-card rounded-2xl p-6 mb-6">
-      <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-100">
-        <CalendarIcon className="text-indigo-400" /> Schedule
-      </h2>
+    <div className="bento-card rounded-3xl p-5 hover:border-indigo-500/20 transition-colors">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-indigo-400" />
+          Schedule
+        </h2>
+      </div>
       <div className="flex">
         {renderDay(calendarResponse?.today, true)}
         {renderDay(calendarResponse?.tomorrow, false)}

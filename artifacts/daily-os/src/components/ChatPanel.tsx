@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useProcessChat, getGetTasksQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Send, Bot, User, CheckCircle2, Mic, MicOff, AlertCircle, Square } from "lucide-react";
+import { Send, Bot, User, CheckCircle2, Mic, MicOff, AlertCircle, Square, Zap } from "lucide-react";
 
 interface Message {
   role: "user" | "bot" | "system";
@@ -95,7 +95,6 @@ export function ChatPanel() {
     }
   };
 
-  // ── Voice: MediaRecorder + Whisper ─────────────────────────────────────────
   const startRecording = async () => {
     setVoiceError(null);
     try {
@@ -145,7 +144,6 @@ export function ChatPanel() {
       const data = await res.json() as { success: boolean; text?: string; error?: string };
 
       if (data.success && data.text?.trim()) {
-        // Auto-send the transcribed text immediately
         sendMessage(data.text.trim());
       } else if (data.success && !data.text?.trim()) {
         setVoiceError("No speech detected. Please try again.");
@@ -162,28 +160,38 @@ export function ChatPanel() {
   const voiceBusy = isRecording || isTranscribing;
 
   return (
-    <div className="glass-card rounded-2xl flex flex-col h-[calc(100vh-48px)] sticky top-6">
-
+    <div
+      className="rounded-3xl flex flex-col lg:sticky lg:top-6 overflow-hidden"
+      style={{
+        background: "rgba(30, 27, 75, 0.25)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        border: "1px solid rgba(99, 102, 241, 0.18)",
+        boxShadow: "0 0 48px -16px rgba(79, 70, 229, 0.25)",
+        height: "calc(100vh - 80px)",
+        minHeight: "600px",
+      }}
+    >
       {/* Header */}
-      <div className="p-4 border-b border-white/10 flex items-center gap-3 bg-slate-900/50 backdrop-blur-md rounded-t-2xl">
+      <div className="p-4 pb-3.5 border-b border-indigo-500/10 flex items-center gap-3 flex-shrink-0">
         <div className="relative">
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shadow-[0_0_12px_rgba(37,99,235,0.4)]">
-            <Bot size={18} className="text-white" />
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <Zap size={16} className="text-white" />
           </div>
-          <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-[#0f172a] rounded-full" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 border-2 border-[#0a0a14] rounded-full" />
         </div>
         <div className="flex-1">
-          <h2 className="font-semibold text-slate-100 text-sm">Daily OS Assistant</h2>
-          <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
-            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" /> ONLINE · Notion Connected
+          <h2 className="font-semibold text-white text-sm">Nova OS</h2>
+          <div className="text-[10px] text-indigo-300/70 font-mono flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" /> Always online
           </div>
         </div>
       </div>
 
       {/* Pending task banner */}
       {pendingTask && (
-        <div className="mx-3 mt-3 px-3 py-2 bg-amber-500/10 border border-amber-500/25 rounded-xl flex items-start gap-2 text-xs text-amber-300 flex-shrink-0">
-          <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+        <div className="mx-3 mt-3 px-3 py-2 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start gap-2 text-xs text-amber-300 flex-shrink-0">
+          <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
           <span>
             <span className="font-semibold">Creating: </span>
             <span className="font-mono">"{pendingTask.title ?? "…"}"</span>
@@ -193,22 +201,28 @@ export function ChatPanel() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bento-scrollbar">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-in fade-in duration-200`}>
             {msg.role === "system" ? (
-              <div className="mx-auto bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 font-mono">
-                <CheckCircle2 size={11} /> {msg.content}
+              <div className="mx-auto bg-emerald-500/10 border border-emerald-500/15 text-emerald-400 px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 font-mono">
+                <CheckCircle2 size={10} /> {msg.content}
               </div>
             ) : (
               <div className={`flex max-w-[90%] gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 ${msg.role === "user" ? "bg-blue-600" : "bg-slate-800 border border-white/10"}`}>
-                  {msg.role === "user" ? <User size={12} className="text-white" /> : <Bot size={12} className="text-blue-400" />}
-                </div>
-                <div className={`px-3 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 ${
                   msg.role === "user"
-                    ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-tr-sm"
-                    : "bg-slate-800/80 border border-white/5 text-slate-200 rounded-tl-sm"
+                    ? "bg-indigo-600 border border-indigo-500/50"
+                    : "bg-indigo-950 border border-indigo-500/20"
+                }`}>
+                  {msg.role === "user"
+                    ? <User size={11} className="text-white" />
+                    : <Bot size={11} className="text-indigo-400" />}
+                </div>
+                <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+                  msg.role === "user"
+                    ? "bg-indigo-600 text-white rounded-tr-sm"
+                    : "bg-white/[0.03] border border-white/[0.05] text-slate-300 rounded-tl-sm"
                 }`}>
                   {msg.content}
                 </div>
@@ -220,16 +234,16 @@ export function ChatPanel() {
         {(processChat.isPending || isTranscribing) && (
           <div className="flex justify-start animate-in fade-in">
             <div className="flex gap-2">
-              <div className="w-6 h-6 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center shrink-0 mt-1">
-                <Bot size={12} className="text-blue-400" />
+              <div className="w-6 h-6 rounded-full bg-indigo-950 border border-indigo-500/20 flex items-center justify-center shrink-0 mt-1">
+                <Bot size={11} className="text-indigo-400" />
               </div>
-              <div className="px-3 py-2.5 rounded-2xl rounded-tl-sm bg-slate-800/80 border border-white/5 flex items-center gap-1.5">
+              <div className="px-3.5 py-2.5 rounded-2xl rounded-tl-sm bg-white/[0.03] border border-white/[0.05] flex items-center gap-1.5">
                 {isTranscribing
-                  ? <span className="text-xs text-slate-400 font-mono animate-pulse">Transcribing…</span>
+                  ? <span className="text-xs text-slate-500 font-mono animate-pulse">Transcribing…</span>
                   : <>
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:0.15s]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce [animation-delay:0.3s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0.15s]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0.3s]" />
                   </>
                 }
               </div>
@@ -241,31 +255,31 @@ export function ChatPanel() {
 
       {/* Voice error */}
       {voiceError && (
-        <div className="mx-3 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400 flex items-center gap-2 flex-shrink-0">
-          <AlertCircle size={11} />
+        <div className="mx-3 mb-2 px-3 py-2 bg-red-500/10 border border-red-500/15 rounded-xl text-xs text-red-400 flex items-center gap-2 flex-shrink-0">
+          <AlertCircle size={10} />
           <span className="flex-1">{voiceError}</span>
           <button onClick={() => setVoiceError(null)} className="text-red-400/50 hover:text-red-400 flex-shrink-0">✕</button>
         </div>
       )}
 
       {/* Input area */}
-      <div className="p-3 border-t border-white/10 bg-slate-900/50 backdrop-blur-md rounded-b-2xl flex-shrink-0">
+      <div className="p-3 border-t border-indigo-500/10 flex-shrink-0">
         <div className="flex items-end gap-2">
           {/* Voice button */}
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
             disabled={processChat.isPending || isTranscribing}
-            title={isRecording ? "Stop & transcribe" : "Hold to record voice"}
+            title={isRecording ? "Stop & transcribe" : "Record voice"}
             className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 mb-0.5 ${
               isRecording
-                ? "bg-red-500 hover:bg-red-400 shadow-[0_0_12px_rgba(239,68,68,0.5)] animate-pulse"
+                ? "bg-red-500 hover:bg-red-400 shadow-[0_0_12px_rgba(239,68,68,0.4)] animate-pulse"
                 : isTranscribing
-                  ? "bg-amber-500/30 text-amber-400"
-                  : "bg-white/8 hover:bg-white/15 border border-white/10 text-slate-400 hover:text-slate-200"
+                  ? "bg-amber-500/20 text-amber-400"
+                  : "bg-white/[0.05] hover:bg-indigo-500/20 border border-indigo-500/20 text-slate-500 hover:text-indigo-300"
             }`}
           >
-            {isRecording ? <Square size={13} className="text-white" /> : <Mic size={15} />}
+            {isRecording ? <Square size={12} className="text-white" /> : <Mic size={14} />}
           </button>
 
           {/* Textarea */}
@@ -276,33 +290,38 @@ export function ChatPanel() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isRecording ? "Recording… click ■ to stop" : isTranscribing ? "Transcribing…" : pendingTask ? "Reply with missing details…" : "Message… (Enter to send, Shift+Enter for new line)"}
+              placeholder={
+                isRecording ? "Recording… click ■ to stop"
+                : isTranscribing ? "Transcribing…"
+                : pendingTask ? "Reply with missing details…"
+                : "Ask Nova anything…"
+              }
               disabled={processChat.isPending || voiceBusy}
-              className={`w-full resize-none bg-black/40 border rounded-xl py-2.5 pl-3.5 pr-10 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 transition-all disabled:opacity-60 leading-5 max-h-[140px] overflow-y-auto ${
+              className={`w-full resize-none rounded-2xl py-2.5 pl-3.5 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-1 transition-all disabled:opacity-60 leading-5 max-h-[140px] overflow-y-auto ${
                 isRecording
-                  ? "border-red-500/50"
+                  ? "bg-black/40 border border-red-500/30"
                   : pendingTask
-                    ? "border-amber-500/40 focus:ring-amber-500/30"
-                    : "border-white/10 focus:ring-blue-500/30 focus:border-blue-500/40"
+                    ? "bg-black/40 border border-amber-500/30 focus:ring-amber-500/25"
+                    : "bg-black/30 border border-indigo-500/20 focus:ring-indigo-500/30 focus:border-indigo-500/40"
               }`}
             />
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || processChat.isPending || voiceBusy}
-              className="absolute right-1.5 bottom-1.5 p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+              className="absolute right-1.5 bottom-1.5 p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-white/[0.05] disabled:text-slate-600 text-white transition-colors"
             >
-              <Send size={13} />
+              <Send size={12} />
             </button>
           </div>
         </div>
 
         {isRecording && (
-          <div className="flex items-center justify-center gap-2 mt-1.5 text-[11px] text-red-400 font-mono">
+          <div className="flex items-center justify-center gap-2 mt-1.5 text-[10px] text-red-400 font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-ping" />
             Recording — tap ■ when done
           </div>
         )}
-        <p className="text-center text-[10px] text-slate-600 mt-1.5 font-mono">Enter to send · Shift+Enter for new line</p>
+        <p className="text-center text-[10px] text-slate-700 mt-1 font-mono">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   );
