@@ -73,6 +73,12 @@ export function ChatPanel() {
         if (data.action_taken === "task_created") {
           queryClient.invalidateQueries({ queryKey: getGetTasksQueryKey() });
           addMessage({ role: "system", content: "Task synced to Notion." });
+        } else if (data.action_taken === "task_updated") {
+          queryClient.invalidateQueries({ queryKey: getGetTasksQueryKey() });
+          addMessage({ role: "system", content: "Notion updated." });
+        } else if (data.action_taken === "task_deleted") {
+          queryClient.invalidateQueries({ queryKey: getGetTasksQueryKey() });
+          addMessage({ role: "system", content: "Task removed from Notion." });
         }
       },
       onError: () => {

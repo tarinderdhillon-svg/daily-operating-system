@@ -303,6 +303,110 @@ router.post("/", async (req, res): Promise<void> => {
       return;
     }
 
+    // ─── UPDATE / DELETE TASK ────────────────────────────────────────────────
+    const isUpdateIntent =
+      lowerMsg.includes("mark ") || lowerMsg.includes("change ") ||
+      lowerMsg.includes("update ") || lowerMsg.includes("set ") ||
+      lowerMsg.includes("complete ") || lowerMsg.includes("done ") ||
+      (lowerMsg.includes("task") && (lowerMsg.includes(" to ") || lowerMsg.includes("status") || lowerMsg.includes("priority")));
+
+    const isDeleteIntent =
+      (lowerMsg.includes("delete") || lowerMsg.includes("remove") || lowerMsg.includes("archive")) &&
+      lowerMsg.includes("task");
+
+    if ((isUpdateIntent || isDeleteIntent) && !lowerMsg.includes("create") && !lowerMsg.includes("add")) {
+      // Use Gemini to parse the command
+      const parsePrompt = `Parse this task management command. Today is ${TODAY()}.
+
+Command: "${message}"
+
+Return ONLY valid JSON (no markdown):
+{
+  "action": "update_status" | "update_priority" | "update_due_date" | "update_title" | "delete" | "unknown",
+  "task_name": "the name of the task to modify (as close to original as possible)",
+  "new_value": "the new status/priority/date/title value, or null for delete"
+}
+
+Status values: Not started, In progress, In Review, Done
+Priority values: Urgent, High, Medium, Low
+Date format: YYYY-MM-DD
+
+Examples:
+- "mark moving house as done" → action: update_status, task_name: "moving house", new_value: "Done"
+- "change house move to done" → action: update_status, task_name: "house move", new_value: "Done"
+- "set reschedule microsoft training to high priority" → action: update_priority, task_name: "reschedule microsoft training", new_value: "High"
+- "delete the test task" → action: delete, task_name: "test", new_value: null`;
+
+      let parsed: { action: string; task_name: string | null; new_value: string | null } = { action: "unknown", task_name: null, new_value: null };
+      try {
+        let raw = await geminiGenerate(parsePrompt);
+        raw = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
+        parsed = JSON.parse(raw);
+      } catch { /* fall through to unknown */ }
+
+      if (parsed.action !== "unknown" && parsed.task_name) {
+        // Find task by fuzzy name match
+        const allTasks = await getTasksFromNotion();
+        const queryLower = parsed.task_name.toLowerCase();
+        const matched = allTasks.find((t: { title: string }) =>
+          t.title.toLowerCase().includes(queryLower) ||
+          queryLower.includes(t.title.toLowerCase()) ||
+          t.title.toLowerCase().split(" ").some((w: string) => w.length > 3 && queryLower.includes(w))
+        ) as { id: string; title: string } | undefined;
+
+        if (!matched) {
+          res.json({
+            success: true,
+            response: `I couldn't find a task matching "${parsed.task_name}". Try "show my tasks" to see the exact names.`,
+            action_taken: "task_not_found",
+            data: null,
+          });
+          return;
+        }
+
+        if (parsed.action === "delete") {
+          await notionRequest(`/pages/${matched.id}`, "PATCH", { archived: true });
+          res.json({
+            success: true,
+            response: `Task "${matched.title}" has been deleted.`,
+            action_taken: "task_deleted",
+            data: { task_id: matched.id, title: matched.title },
+          });
+          return;
+        }
+
+        const updateProps: Record<string, unknown> = {};
+        let summary = "";
+
+        if (parsed.action === "update_status" && parsed.new_value) {
+          const norm = normaliseStatus(parsed.new_value) ?? parsed.new_value;
+          updateProps["Status"] = { status: { name: norm } };
+          summary = `status → "${norm}"`;
+        } else if (parsed.action === "update_priority" && parsed.new_value) {
+          updateProps["Priority"] = { select: { name: parsed.new_value } };
+          summary = `priority → "${parsed.new_value}"`;
+        } else if (parsed.action === "update_due_date" && parsed.new_value) {
+          updateProps["Due Date"] = { date: { start: parsed.new_value } };
+          summary = `due date → ${parsed.new_value}`;
+        } else if (parsed.action === "update_title" && parsed.new_value) {
+          updateProps["Name"] = { title: [{ text: { content: parsed.new_value } }] };
+          summary = `renamed to "${parsed.new_value}"`;
+        }
+
+        if (Object.keys(updateProps).length > 0) {
+          await notionRequest(`/pages/${matched.id}`, "PATCH", { properties: updateProps });
+          res.json({
+            success: true,
+            response: `Task "${matched.title}" updated — ${summary}.`,
+            action_taken: "task_updated",
+            data: { task_id: matched.id, title: matched.title },
+          });
+          return;
+        }
+      }
+      // If we couldn't parse intent clearly, fall through to general AI
+    }
+
     // ─── SHOW TASKS ──────────────────────────────────────────────────────────
     if (lowerMsg.includes("show") && (lowerMsg.includes("task") || lowerMsg.includes("overdue") || lowerMsg.includes("outstanding") || lowerMsg.includes("to-do") || lowerMsg.includes("todo"))) {
       const tasks   = await getTasksFromNotion();
