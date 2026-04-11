@@ -17,55 +17,25 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get all tasks categorized
  */
+const TaskItem = zod.object({
+  id: zod.string(),
+  title: zod.string(),
+  due_date: zod.string().nullish(),
+  priority: zod.enum(["Urgent", "High", "Medium", "Low"]).nullish(),
+  status: zod.string().nullish(),
+  notes: zod.string().nullish(),
+});
+
 export const GetTasksResponse = zod.object({
   success: zod.boolean(),
-  tasks: zod.array(
-    zod.object({
-      id: zod.string(),
-      title: zod.string(),
-      due_date: zod.string().nullish(),
-      priority: zod.enum(["High", "Medium", "Low"]).nullish(),
-      status: zod.string().nullish(),
-    }),
-  ),
+  tasks: zod.array(TaskItem),
   categorized: zod.object({
-    overdue: zod.array(
-      zod.object({
-        id: zod.string(),
-        title: zod.string(),
-        due_date: zod.string().nullish(),
-        priority: zod.enum(["High", "Medium", "Low"]).nullish(),
-        status: zod.string().nullish(),
-      }),
-    ),
-    outstanding: zod.array(
-      zod.object({
-        id: zod.string(),
-        title: zod.string(),
-        due_date: zod.string().nullish(),
-        priority: zod.enum(["High", "Medium", "Low"]).nullish(),
-        status: zod.string().nullish(),
-      }),
-    ),
-    todo: zod.array(
-      zod.object({
-        id: zod.string(),
-        title: zod.string(),
-        due_date: zod.string().nullish(),
-        priority: zod.enum(["High", "Medium", "Low"]).nullish(),
-        status: zod.string().nullish(),
-      }),
-    ),
+    overdue:     zod.array(TaskItem),
+    outstanding: zod.array(TaskItem),
+    inProgress:  zod.array(TaskItem).optional(),
+    todo:        zod.array(TaskItem),
   }),
-  completed: zod.array(
-    zod.object({
-      id: zod.string(),
-      title: zod.string(),
-      due_date: zod.string().nullish(),
-      priority: zod.enum(["High", "Medium", "Low"]).nullish(),
-      status: zod.string().nullish(),
-    }),
-  ).optional(),
+  completed: zod.array(TaskItem).optional(),
 });
 
 /**
@@ -74,7 +44,9 @@ export const GetTasksResponse = zod.object({
 export const CreateTaskBody = zod.object({
   title: zod.string(),
   due_date: zod.string().nullish(),
-  priority: zod.enum(["High", "Medium", "Low"]).nullish(),
+  priority: zod.enum(["Urgent", "High", "Medium", "Low"]).nullish(),
+  status: zod.string().nullish(),
+  notes: zod.string().nullish(),
 });
 
 export const CreateTaskResponse = zod.object({
@@ -93,8 +65,9 @@ export const UpdateTaskParams = zod.object({
 export const UpdateTaskBody = zod.object({
   title: zod.string().nullish(),
   status: zod.string().nullish(),
-  priority: zod.enum(["High", "Medium", "Low"]).nullish(),
+  priority: zod.enum(["Urgent", "High", "Medium", "Low"]).nullish(),
   due_date: zod.string().nullish(),
+  notes: zod.string().nullish(),
 });
 
 export const UpdateTaskResponse = zod.object({

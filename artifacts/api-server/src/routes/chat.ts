@@ -69,6 +69,7 @@ interface TaskFields {
   due_date: string | null;
   priority: string | null;
   status: string | null;
+  notes: string | null;
 }
 
 async function createNotionTask(fields: TaskFields) {
@@ -79,6 +80,7 @@ async function createNotionTask(fields: TaskFields) {
   };
   if (fields.due_date) properties["Due Date"] = { date: { start: fields.due_date } };
   if (fields.priority) properties["Priority"] = { select: { name: fields.priority } };
+  if (fields.notes)    properties["Notes"]    = { rich_text: [{ text: { content: fields.notes } }] };
   const page = await notionRequest("/pages", "POST", {
     parent: { database_id: NOTION_DB_ID },
     properties,
@@ -95,14 +97,16 @@ Return ONLY valid JSON with exactly these fields:
 {
   "title": "the task name, or null if not found",
   "due_date": "ISO date YYYY-MM-DD based on what the user says (e.g. '15th April 2026' → '2026-04-15'), or null",
-  "priority": "High, Medium, or Low exactly, or null if not mentioned",
-  "status": "In progress, Not started, or In Review exactly (map user's words), or null if not mentioned"
+  "priority": "Urgent, High, Medium, or Low exactly, or null if not mentioned",
+  "status": "In progress, Not started, or In Review exactly (map user's words), or null if not mentioned",
+  "notes": "any extra context, description, or notes about the task, or null"
 }
 
 Examples:
 - "in progress" or "status in progress" → "In progress"
-- "high priority" → "High"
+- "high priority" or "urgent" → "High" or "Urgent"
 - "due 15th April" or "due April 15" → "2026-04-15"
+- "notes: call John first" or "reminder to check the invoice" → populate notes field
 Only return the JSON object, no other text.`;
 
   const res = await client.chat.completions.create({
@@ -163,10 +167,17 @@ router.post("/", async (req, res): Promise<void> => {
         return;
       }
 
+      // treat "none" / "skip" / "n/a" answers as explicitly filling the field
+      const isNoneAnswer = (v: string | null) => v && ["none", "n/a", "skip", "no notes", "no priority", "no status"].includes(v.toLowerCase().trim());
+      if (isNoneAnswer(supplement.notes))    merged.notes    = "";
+      if (isNoneAnswer(supplement.priority)) merged.priority = null;
+      if (isNoneAnswer(supplement.status))   merged.status   = null;
+
       const stillMissing = [];
       if (!merged.due_date) stillMissing.push("due date");
-      if (!merged.priority) stillMissing.push("priority (High, Medium, or Low)");
+      if (!merged.priority) stillMissing.push("priority (Urgent, High, Medium, or Low)");
       if (!merged.status)   stillMissing.push("status (Not started, In progress, or In Review)");
+      if (merged.notes === null) stillMissing.push("notes / any extra context (or say 'none')");
 
       if (stillMissing.length > 0) {
         res.json({
@@ -209,8 +220,9 @@ router.post("/", async (req, res): Promise<void> => {
 
       const missing: string[] = [];
       if (!extracted.due_date) missing.push("due date");
-      if (!extracted.priority) missing.push("priority (High, Medium, or Low)");
+      if (!extracted.priority) missing.push("priority (Urgent, High, Medium, or Low)");
       if (!extracted.status)   missing.push("status (Not started, In progress, or In Review)");
+      if (!extracted.notes)    missing.push("notes / any extra context (or say 'none')");
 
       if (missing.length > 0) {
         res.json({

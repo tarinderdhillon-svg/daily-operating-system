@@ -11,8 +11,9 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 const NOTION_API_KEY = "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";
-const NOTION_DB_ID = "3356990a287981128f2ffe49ada5e44f";
+const NOTION_DB_ID  = "3356990a287981128f2ffe49ada5e44f";
 const NOTION_VERSION = "2022-06-28";
+const DONE_STATUSES = new Set(["done", "complete", "completed"]);
 
 interface NotionTask {
   id: string;
@@ -21,30 +22,22 @@ interface NotionTask {
     "Due Date"?: { date: { start: string } | null };
     Priority?: { select: { name: string } | null };
     Status?: { status: { name: string } | null };
+    Notes?: { rich_text: Array<{ plain_text: string }> };
   };
 }
 
 function parseTask(page: NotionTask) {
-  const title =
-    page.properties?.Name?.title?.map((t) => t.plain_text).join("") ?? "";
+  const title    = page.properties?.Name?.title?.map((t) => t.plain_text).join("") ?? "";
   const due_date = page.properties?.["Due Date"]?.date?.start ?? null;
-  const priority =
-    (page.properties?.Priority?.select?.name as
-      | "High"
-      | "Medium"
-      | "Low"
-      | null) ?? null;
-  const status = page.properties?.Status?.status?.name ?? null;
-  return { id: page.id, title, due_date, priority, status };
+  const priority = (page.properties?.Priority?.select?.name as "Urgent" | "High" | "Medium" | "Low" | null) ?? null;
+  const status   = page.properties?.Status?.status?.name ?? null;
+  const notes    = page.properties?.Notes?.rich_text?.map((t) => t.plain_text).join("") || null;
+  return { id: page.id, title, due_date, priority, status, notes };
 }
 
-async function notionRequest(
-  path: string,
-  method: string = "GET",
-  body?: object,
-) {
+async function notionRequest(path: string, method = "GET", body?: object) {
   const url = `https://api.notion.com/v1${path}`;
-  const opts: RequestInit = {
+  const res = await fetch(url, {
     method,
     headers: {
       Authorization: `Bearer ${NOTION_API_KEY}`,
@@ -52,18 +45,11 @@ async function notionRequest(
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
-  };
-  const res = await fetch(url, opts);
+  });
   const json = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      `Notion API error ${res.status}: ${JSON.stringify(json)}`,
-    );
-  }
+  if (!res.ok) throw new Error(`Notion API error ${res.status}: ${JSON.stringify(json)}`);
   return json;
 }
-
-const DONE_STATUSES = new Set(["done", "complete", "completed"]);
 
 router.get("/", async (req, res): Promise<void> => {
   try {
@@ -73,30 +59,26 @@ router.get("/", async (req, res): Promise<void> => {
     });
 
     const allTasks = (data.results as NotionTask[]).map(parseTask);
-
-    const completed = allTasks.filter(t => DONE_STATUSES.has((t.status ?? "").toLowerCase()));
+    const completed  = allTasks.filter(t => DONE_STATUSES.has((t.status ?? "").toLowerCase()));
     const activeTasks = allTasks.filter(t => !DONE_STATUSES.has((t.status ?? "").toLowerCase()));
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+    const today   = new Date(); today.setHours(0, 0, 0, 0);
+    const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
 
-    const overdue: typeof activeTasks = [];
+    const overdue:     typeof activeTasks = [];
     const outstanding: typeof activeTasks = [];
-    const todo: typeof activeTasks = [];
+    const inProgress:  typeof activeTasks = [];
+    const todo:        typeof activeTasks = [];
 
     for (const task of activeTasks) {
-      if (!task.due_date) {
-        todo.push(task);
-        continue;
+      if (task.due_date) {
+        const d = new Date(task.due_date); d.setHours(0, 0, 0, 0);
+        if (d < today)    { overdue.push(task);     continue; }
+        if (d <= nextWeek){ outstanding.push(task); continue; }
       }
-      const d = new Date(task.due_date);
-      d.setHours(0, 0, 0, 0);
-      if (d < today) {
-        overdue.push(task);
-      } else if (d <= nextWeek) {
-        outstanding.push(task);
+      // Not urgently dated — bucket by status
+      if ((task.status ?? "").toLowerCase() === "in progress") {
+        inProgress.push(task);
       } else {
         todo.push(task);
       }
@@ -106,7 +88,7 @@ router.get("/", async (req, res): Promise<void> => {
       GetTasksResponse.parse({
         success: true,
         tasks: activeTasks,
-        categorized: { overdue, outstanding, todo },
+        categorized: { overdue, outstanding, inProgress, todo },
         completed,
       }),
     );
@@ -123,32 +105,23 @@ router.post("/", async (req, res): Promise<void> => {
     return;
   }
 
-  const { title, due_date, priority } = parsed.data;
+  const { title, due_date, priority, status, notes } = parsed.data;
 
   try {
     const properties: Record<string, unknown> = {
-      Name: { title: [{ text: { content: title } }] },
-      Status: { status: { name: "Not started" } },
+      Name:   { title: [{ text: { content: title } }] },
+      Status: { status: { name: status ?? "Not started" } },
     };
-
-    if (due_date) {
-      properties["Due Date"] = { date: { start: due_date } };
-    }
-
-    if (priority) {
-      properties["Priority"] = { select: { name: priority } };
-    }
+    if (due_date) properties["Due Date"] = { date: { start: due_date } };
+    if (priority) properties["Priority"] = { select: { name: priority } };
+    if (notes)    properties["Notes"]    = { rich_text: [{ text: { content: notes } }] };
 
     const page = await notionRequest("/pages", "POST", {
       parent: { database_id: NOTION_DB_ID },
       properties,
     });
 
-    res.json({
-      success: true,
-      message: "Task created successfully",
-      task_id: page.id,
-    });
+    res.json({ success: true, message: "Task created successfully", task_id: page.id });
   } catch (err) {
     req.log.error({ err }, "Failed to create task");
     res.status(500).json({ success: false, error: "Failed to create task", message: "Failed to create task" });
@@ -169,28 +142,18 @@ router.patch("/:taskId", async (req, res): Promise<void> => {
   }
 
   const { taskId } = paramsParsed.data;
-  const { title, status, priority, due_date } = bodyParsed.data;
+  const { title, status, priority, due_date, notes } = bodyParsed.data;
 
   try {
     const properties: Record<string, unknown> = {};
-
-    if (title !== undefined && title !== null) {
-      properties["Name"] = { title: [{ text: { content: title } }] };
-    }
-    if (status !== undefined && status !== null) {
-      properties["Status"] = { status: { name: status } };
-    }
-    if (priority !== undefined && priority !== null) {
-      properties["Priority"] = { select: { name: priority } };
-    }
-    if (due_date !== undefined && due_date !== null) {
-      properties["Due Date"] = { date: { start: due_date } };
-    } else if (due_date === null && "due_date" in bodyParsed.data) {
-      properties["Due Date"] = { date: null };
-    }
+    if (title    != null) properties["Name"]     = { title: [{ text: { content: title } }] };
+    if (status   != null) properties["Status"]   = { status: { name: status } };
+    if (priority != null) properties["Priority"] = { select: { name: priority } };
+    if (due_date != null) properties["Due Date"] = { date: { start: due_date } };
+    else if (due_date === null && "due_date" in bodyParsed.data) properties["Due Date"] = { date: null };
+    if (notes    != null) properties["Notes"]    = { rich_text: [{ text: { content: notes } }] };
 
     await notionRequest(`/pages/${taskId}`, "PATCH", { properties });
-
     res.json({ success: true, message: "Task updated successfully" });
   } catch (err) {
     req.log.error({ err }, "Failed to update task");
@@ -206,7 +169,6 @@ router.delete("/:taskId", async (req, res): Promise<void> => {
   }
 
   const { taskId } = paramsParsed.data;
-
   try {
     await notionRequest(`/pages/${taskId}`, "PATCH", { archived: true });
     res.json({ success: true, message: "Task deleted successfully" });
