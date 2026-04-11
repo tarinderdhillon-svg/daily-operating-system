@@ -1,16 +1,17 @@
 import { Router } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { logger } from "../lib/logger";
 
 const router = Router();
 
-const GEMINI_MODEL = "gemini-2.5-flash-lite";  // cheapest capable Gemini model
+// Chat uses cheap/fast lite model; briefing uses full Flash for grounding quality
+const CHAT_MODEL    = "gemini-2.5-flash-lite";
+const BRIEFING_MODEL = "gemini-2.5-flash";  // supports Google Search grounding
 
-function getGemini() {
+function getGemini(model = BRIEFING_MODEL) {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
   const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: GEMINI_MODEL });
+  return genAI.getGenerativeModel({ model });
 }
 
 interface CachedBriefing {
@@ -31,85 +32,151 @@ interface BriefingArticle {
 let cachedBriefing: CachedBriefing | null = null;
 
 const AI_TECH_TOPICS = [
-  "OpenAI GPT-5 and latest large language model developments",
-  "Google DeepMind Gemini model updates and AI research breakthroughs",
-  "AI agents and autonomous systems in enterprise software",
-  "Generative AI coding tools and developer productivity (Cursor, GitHub Copilot)",
-  "AI infrastructure and GPU computing market (NVIDIA, AMD)",
-  "Machine learning research: multimodal models, reinforcement learning advances",
+  "OpenAI latest model releases and GPT developments this week",
+  "Google DeepMind Gemini updates and AI research announcements",
+  "AI coding assistants and developer productivity tools (Cursor, GitHub Copilot, Claude)",
+  "NVIDIA and GPU computing: latest earnings, products, AI infrastructure",
+  "AI agents, autonomous systems and enterprise AI deployments",
+  "LLM research breakthroughs: multimodal, reasoning, open-source models",
 ];
 
 const BUSINESS_TOPICS = [
-  "Global stock market performance and interest rate outlook",
-  "Tech sector earnings and valuation trends",
-  "AI startup funding rounds and venture capital activity",
-  "Semiconductor supply chain and chip manufacturing geopolitics",
-  "Enterprise software M&A and strategic partnerships",
-  "Macroeconomic trends: inflation, employment, central bank policy",
+  "US stock market performance and S&P 500 today",
+  "Tech sector earnings, valuations and major analyst upgrades",
+  "AI startup funding rounds and venture capital deals this week",
+  "Federal Reserve interest rate decisions and inflation data",
+  "Semiconductor industry news: TSMC, Intel, AMD supply chain",
+  "Enterprise software M&A, IPOs and strategic partnerships",
 ];
 
-async function generateArticle(
-  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+async function generateArticleWithGrounding(
   topic: string,
-  category: string,
+  category: "tech" | "business",
 ): Promise<BriefingArticle> {
   const today = new Date().toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
   });
 
-  const sources: Record<string, string[]> = {
-    tech:     ["TechCrunch", "The Verge", "Wired", "MIT Technology Review", "ArXiv", "Ars Technica"],
-    business: ["Financial Times", "Bloomberg", "The Economist", "McKinsey Insights", "Wall Street Journal", "Reuters"],
+  const fallbackSources: Record<string, string[]> = {
+    tech:     ["TechCrunch", "The Verge", "Ars Technica", "MIT Technology Review", "Wired"],
+    business: ["Financial Times", "Bloomberg", "Reuters", "Wall Street Journal", "The Economist"],
   };
-  const sourceList = category === "tech" ? sources.tech : sources.business;
-  const source = sourceList[Math.floor(Math.random() * sourceList.length)];
-
-  const prompt = `Generate a realistic, professional news briefing article about: "${topic}"
-
-Today's date: ${today}
-
-Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
-{
-  "title": "compelling headline (under 80 chars)",
-  "summary": "2-3 sentences covering the key development, business impact, and implications for professionals",
-  "key_metrics": "one key data point or metric if relevant, or null",
-  "link": "https://example.com/article"
-}
-
-Make the content feel current, specific, and professionally written. Include realistic-sounding data points where relevant.`;
 
   try {
-    const result  = await model.generateContent(prompt);
-    let raw = result.response.text().trim();
-    // strip markdown code fences if present
+    // Use Gemini with Google Search grounding for real, current articles
+    const model = getGemini(BRIEFING_MODEL);
+    const groundedModel = getGemini(BRIEFING_MODEL);
+
+    // Build a grounded model with googleSearch tool
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+    const searchModel = genAI.getGenerativeModel({
+      model: BRIEFING_MODEL,
+      tools: [{ googleSearch: {} } as any],
+    });
+
+    const prompt = `Today is ${today}. Search for the most recent and significant news about: "${topic}"
+
+Find the single most important story from the past 7 days. Write a professional executive briefing in this JSON format:
+
+{
+  "title": "Compelling specific headline under 85 characters — must reference real company/product/number",
+  "summary": "Three-sentence executive summary: (1) What specifically happened with names and numbers, (2) Why it matters to the industry or market, (3) The key implication or action for a tech/business professional",
+  "key_metrics": "Single most important data point: e.g. '$2.1B funding round', '47% revenue growth', 'Model scores 89% on MMLU' — or null if none",
+  "source_name": "Name of the publication that reported this (e.g. Bloomberg, TechCrunch, Reuters)",
+  "source_url": "Direct URL to the actual article you are citing — must be a real, working URL from search results"
+}
+
+Requirements:
+- Use ONLY real information from search results — no fabricated facts
+- The source_url must be the actual article URL from your search results, not a homepage
+- Include specific company names, product names, dollar amounts, percentages where available
+- Write at executive briefing quality — precise, no fluff
+
+Return ONLY the JSON object, no markdown fences.`;
+
+    const result = await searchModel.generateContent(prompt);
+    const response = result.response;
+
+    // Extract grounding metadata for real URLs
+    const groundingChunks = (response.candidates?.[0] as any)?.groundingMetadata?.groundingChunks ?? [];
+    const firstGroundedChunk = groundingChunks[0];
+    const groundedUrl   = firstGroundedChunk?.web?.uri ?? null;
+    const groundedTitle = firstGroundedChunk?.web?.title ?? null;
+
+    let raw = response.text().trim();
+    // Strip markdown fences if present
     raw = raw.replace(/^```json?\s*/i, "").replace(/```\s*$/, "").trim();
+    // Strip any leading/trailing non-JSON characters
+    const jsonStart = raw.indexOf("{");
+    const jsonEnd   = raw.lastIndexOf("}");
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      raw = raw.slice(jsonStart, jsonEnd + 1);
+    }
+
     const parsed = JSON.parse(raw);
+
+    // Prefer the grounded URL from search metadata (most reliable), then parsed URL
+    const articleUrl = groundedUrl ?? parsed.source_url ?? null;
+    const sourceName = groundedTitle
+      ? new URL(groundedTitle.includes("http") ? groundedTitle : `https://${groundedTitle}`).hostname.replace("www.", "")
+      : (parsed.source_name ?? fallbackSources[category][0]);
+
+    // Validate the URL is actually a real article link
+    const finalUrl = isValidArticleUrl(articleUrl)
+      ? articleUrl
+      : getRelevantFallbackUrl(topic, category);
+
     return {
-      title:       parsed.title       ?? `Latest developments in ${topic}`,
-      source,
+      title:       parsed.title       ?? `Latest: ${topic}`,
+      source:      parsed.source_name ?? sourceName,
       date:        today,
       summary:     parsed.summary     ?? "Summary unavailable.",
       key_metrics: parsed.key_metrics ?? null,
-      link:        parsed.link        ?? "https://techcrunch.com",
+      link:        finalUrl,
     };
-  } catch {
+  } catch (err) {
+    // Graceful degradation — return a useful stub with a relevant real URL
     return {
-      title:       `Latest developments in ${topic}`,
-      source,
+      title:       `Latest in: ${topic}`,
+      source:      fallbackSources[category][0],
       date:        today,
-      summary:     "Unable to generate summary at this time.",
+      summary:     "Real-time data unavailable. Click the source link for the latest news.",
       key_metrics: null,
-      link:        "https://techcrunch.com",
+      link:        getRelevantFallbackUrl(topic, category),
     };
   }
 }
 
-async function buildBriefing(): Promise<CachedBriefing> {
-  const model = getGemini();
+function isValidArticleUrl(url: string | null): boolean {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    // Reject homepage-only URLs (path is just "/" or empty)
+    const hasPath = u.pathname.length > 1 && u.pathname !== "/";
+    return hasPath && (u.protocol === "https:" || u.protocol === "http:");
+  } catch {
+    return false;
+  }
+}
 
+function getRelevantFallbackUrl(topic: string, category: "tech" | "business"): string {
+  const t = topic.toLowerCase();
+  if (t.includes("openai") || t.includes("gpt"))      return "https://techcrunch.com/category/artificial-intelligence/";
+  if (t.includes("google") || t.includes("gemini"))   return "https://techcrunch.com/category/artificial-intelligence/";
+  if (t.includes("nvidia") || t.includes("gpu"))      return "https://www.reuters.com/technology/";
+  if (t.includes("coding") || t.includes("developer")) return "https://techcrunch.com/category/artificial-intelligence/";
+  if (t.includes("stock") || t.includes("market"))    return "https://www.reuters.com/markets/";
+  if (t.includes("federal") || t.includes("rate"))    return "https://www.reuters.com/markets/";
+  if (t.includes("semiconductor") || t.includes("chip")) return "https://www.reuters.com/technology/";
+  if (category === "tech")     return "https://techcrunch.com/category/artificial-intelligence/";
+  return "https://www.reuters.com/business/";
+}
+
+async function buildBriefing(): Promise<CachedBriefing> {
+  // Generate all articles concurrently (6 + 6 = 12 parallel requests)
   const [aiArticles, businessArticles] = await Promise.all([
-    Promise.all(AI_TECH_TOPICS.map((topic) => generateArticle(model, topic, "tech"))),
-    Promise.all(BUSINESS_TOPICS.map((topic) => generateArticle(model, topic, "business"))),
+    Promise.all(AI_TECH_TOPICS.map((topic) => generateArticleWithGrounding(topic, "tech"))),
+    Promise.all(BUSINESS_TOPICS.map((topic) => generateArticleWithGrounding(topic, "business"))),
   ]);
 
   return {
@@ -120,13 +187,9 @@ async function buildBriefing(): Promise<CachedBriefing> {
 }
 
 function isBriefingStale(briefing: CachedBriefing): boolean {
-  const now = new Date();
+  const now       = new Date();
   const generated = new Date(briefing.generated_at);
-
-  // Different calendar day → always stale
   if (generated.toDateString() !== now.toDateString()) return true;
-
-  // Same day: stale if current time is past 05:30 but briefing was generated before 05:30
   const cutoff = new Date(now);
   cutoff.setHours(5, 30, 0, 0);
   return now >= cutoff && generated < cutoff;
@@ -134,12 +197,11 @@ function isBriefingStale(briefing: CachedBriefing): boolean {
 
 router.get("/", async (req, res): Promise<void> => {
   if (cachedBriefing) {
-    // Auto-refresh in background if stale (past 05:30 and not yet refreshed today)
     if (isBriefingStale(cachedBriefing)) {
-      req.log.info("Briefing is stale — triggering background refresh for 05:30 schedule");
+      req.log.info("Briefing stale — triggering background refresh");
       buildBriefing()
-        .then(b => { cachedBriefing = b; })
-        .catch(err => req.log.error({ err }, "Background briefing refresh failed"));
+        .then(b  => { cachedBriefing = b; })
+        .catch(e => req.log.error({ err: e }, "Background briefing refresh failed"));
     }
     res.json({ success: true, briefing: cachedBriefing });
     return;
@@ -149,9 +211,9 @@ router.get("/", async (req, res): Promise<void> => {
 
 router.post("/", async (req, res): Promise<void> => {
   try {
-    req.log.info("Generating daily briefing with Gemini...");
+    req.log.info("Generating daily briefing with Gemini + Google Search grounding…");
     cachedBriefing = await buildBriefing();
-    req.log.info("Briefing generated successfully");
+    req.log.info("Briefing generated with real search results");
     res.json({ success: true, briefing: cachedBriefing });
   } catch (err) {
     req.log.error({ err }, "Failed to generate briefing");
