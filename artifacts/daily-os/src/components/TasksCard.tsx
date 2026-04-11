@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
+import { parseISO, format, isValid } from "date-fns";
 import { useGetTasks, useCreateTask, useUpdateTask, useDeleteTask, getGetTasksQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle } from "lucide-react";
 
 export function TasksCard() {
@@ -136,7 +136,7 @@ export function TasksCard() {
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-slate-200">{task.title}</span>
                       <div className="flex gap-3 text-xs text-slate-400 mt-1">
-                        {task.due_date && <span>Due: {format(new Date(task.due_date), 'MMM d, yyyy')}</span>}
+                        {task.due_date && (() => { try { const d = parseISO(task.due_date); return isValid(d) ? <span>Due: {format(d, 'MMM d, yyyy')}</span> : <span>Due: {task.due_date}</span>; } catch { return <span>Due: {task.due_date}</span>; } })()}
                         <span style={{ color: getPriorityColor(task.priority) }}>{task.priority || 'No Priority'}</span>
                       </div>
                     </div>
