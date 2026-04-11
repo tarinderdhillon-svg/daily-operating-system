@@ -148,6 +148,14 @@ async function generateLesson(concept: typeof curriculumData.concepts[0]): Promi
   return completion.choices[0]?.message?.content ?? "";
 }
 
+function chunkText(text: string, maxLen = 1990): Array<{ text: { content: string } }> {
+  const chunks: Array<{ text: { content: string } }> = [];
+  for (let i = 0; i < text.length; i += maxLen) {
+    chunks.push({ text: { content: text.slice(i, i + maxLen) } });
+  }
+  return chunks.length > 0 ? chunks : [{ text: { content: "" } }];
+}
+
 async function saveToNotion(
   concept: typeof curriculumData.concepts[0],
   lesson: string,
@@ -162,7 +170,7 @@ async function saveToNotion(
       Difficulty: { select: { name: concept.difficulty } },
       Date: { date: { start: today } },
       Status: { select: { name: "New" } },
-      Lesson: { rich_text: [{ text: { content: lesson.slice(0, 2000) } }] },
+      Lesson: { rich_text: chunkText(lesson) },
       "Is Recap": { checkbox: isRecap },
     },
   });
@@ -273,7 +281,7 @@ router.get("/recap", async (req, res): Promise<void> => {
         Difficulty: { select: { name: "Beginner" } },
         Date: { date: { start: today } },
         Status: { select: { name: "New" } },
-        Lesson: { rich_text: [{ text: { content: recap.slice(0, 2000) } }] },
+        Lesson: { rich_text: chunkText(recap) },
         "Is Recap": { checkbox: true },
       },
     }).catch(() => {});

@@ -115,7 +115,7 @@ export function LearningCard() {
   }
 
   return (
-    <div className="bento-card rounded-3xl">
+    <div className="bento-card rounded-3xl" style={{ overflow: "visible" }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.04]">
@@ -230,7 +230,7 @@ export function LearningCard() {
                     Answer saved to Notion — status updated to Reviewed
                   </div>
                 ) : (
-                  <div className="flex items-end gap-2">
+                  <div className="flex gap-2 items-end">
                     <textarea
                       rows={2}
                       value={answer}
@@ -241,7 +241,8 @@ export function LearningCard() {
                     <button
                       onClick={saveAnswer}
                       disabled={!answer.trim() || isSavingAnswer}
-                      className="flex-shrink-0 w-10 h-10 rounded-xl bg-violet-600/80 hover:bg-violet-500 disabled:bg-white/[0.04] disabled:text-slate-600 text-white flex items-center justify-center transition-all"
+                      title="Save answer to Notion"
+                      className="flex-shrink-0 mb-0.5 w-9 h-9 rounded-xl flex items-center justify-center transition-all bg-violet-600 hover:bg-violet-500 disabled:bg-white/[0.05] disabled:opacity-40 text-white"
                     >
                       {isSavingAnswer
                         ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
