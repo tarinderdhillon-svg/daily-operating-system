@@ -1,0 +1,317 @@
+Build a complete Daily Operating System MVP web application with the following features:
+
+OVERVIEW:
+- Full-stack application (frontend + backend in one Replit)
+- Premium dark mode interface with glassmorphic design
+- Real-time Notion integration for task management
+- AI-powered briefing generation
+- Chat-based task management
+- Calendar view for schedule management
+
+FRONTEND (HTML/CSS/JavaScript served from Flask):
+
+1. Layout & Design:
+   - Two-column responsive layout
+   - Left: 60% - Dashboard content
+   - Right: 40% - Chat interface
+   - Dark mode gradient background (navy to dark blue: #0f172a to #16213e)
+   - Premium glassmorphic cards with blur effects
+   - Smooth animations and transitions
+   - Professional Inter font family
+   - Color scheme: Blues, whites, and accent colors (red=urgent, orange=pending, green=done)
+
+2. Left Panel - Dashboard:
+
+   A. Header Section:
+      - Title: "Daily Operating System"
+      - Subtitle: "Tasks • Calendar • Intelligence"
+      - Status indicators (Notion connected, etc.)
+
+   B. Today's Schedule Card:
+      - Display date (e.g., "Friday, April 10, 2026")
+      - List of events from calendar for today
+      - Show event time and title
+      - Empty state if no events: "No events scheduled"
+
+   C. Tomorrow's Schedule Card:
+      - Display date
+      - List of events from calendar for tomorrow
+      - Empty state if no events
+
+   D. Tasks & Priorities Card:
+      - Three sections:
+        * 🔴 Overdue: Tasks with due date < today (red highlight)
+        * ⚠️ Outstanding (Due Soon): Tasks due within 7 days (orange highlight)
+        * 📝 To-Do: All other tasks (blue highlight)
+      - For each task show:
+        * Task title
+        * Due date
+        * Priority (High/Medium/Low)
+        * Status
+      - Inline action buttons: Edit, Delete (interactive)
+      - Color-coded left border based on priority
+      - Empty states for each section
+
+   E. Daily Briefing Card:
+      - Title: "📰 Daily Tech & Business Briefing"
+      - Display timestamp of last briefing generation
+      - Two sections:
+        * AI & Technology News (6 articles)
+        * Business & Markets (6 articles)
+      - For each article show:
+        * Article title
+        * Publication source and date
+        * 2-3 sentence enriched summary with business impact
+        * Key metrics or data points if available
+        * Clickable source link
+      - "Generate Briefing Now" button (triggers from chat)
+      - Auto-refresh indicator showing when last updated
+
+3. Right Panel - Chat Interface:
+
+   A. Chat Header:
+      - Title: "💬 Daily OS Assistant"
+      - Shows connection status
+
+   B. Messages Area:
+      - Scrollable message history
+      - User messages: Right-aligned, blue gradient background
+      - Bot messages: Left-aligned, dark background with border
+      - System messages: Green-tinted for task confirmations
+      - Smooth fade-in animations for new messages
+      - Auto-scroll to latest message
+
+   C. Input Area:
+      - Text input field with placeholder: "What do you need?"
+      - Send button
+      - Real-time input processing
+
+CHAT CAPABILITIES:
+
+1. Task Management Commands:
+   - "Create task: [title] due [date], [priority]"
+     → Creates task in Notion, displays in dashboard
+   - "Update task: [task name] to [priority/status]"
+     → Updates existing task
+   - "Delete task: [task name]"
+     → Deletes task from Notion
+   - "Show my [overdue/outstanding/to-do] tasks"
+     → Displays filtered task list
+   - "What tasks do I have?"
+     → Lists all tasks with categorization
+
+2. Calendar Queries:
+   - "What's my schedule today?"
+     → Shows today's events
+   - "What's tomorrow look like?"
+     → Shows tomorrow's events
+   - "Do I have time for a 1-hour meeting on [date] at [time]?"
+     → Checks calendar conflicts
+   - "Create event: [title] on [date] at [time] for [duration]"
+     → Creates calendar event (prepare for future Outlook integration)
+
+3. Briefing Commands:
+   - "Generate my daily briefing"
+     → Fetches latest tech & business news, enriches with summaries
+   - "What's new in AI?"
+     → Shows latest AI & Tech articles
+   - "Show me business news"
+     → Shows Business & Markets articles
+   - "What should I know today?"
+     → Comprehensive briefing summary
+
+4. General Intelligence:
+   - "What's my priority today?"
+     → Analyzes tasks and calendar, provides focus suggestions
+   - "Am I on track?"
+     → Evaluates progress on tasks
+   - Conversational responses to any input
+
+BACKEND (Flask Python):
+
+1. Core Setup:
+   - Flask application with CORS enabled
+   - Serve static frontend on GET /
+   - All API endpoints at /api/*
+
+2. Notion Integration:
+   - API Key: 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
+   - Tasks Database ID: 3356990a287981128f2ffe49ada5e44f
+   - Notion API Version: 2022-06-28
+   - Proper error handling for API failures
+
+3. API Endpoints:
+
+   GET /
+   - Serves the frontend HTML/CSS/JS
+   - Main application page
+
+   GET /health
+   - Returns: {"status": "ok", "message": "Daily OS MVP running"}
+
+   POST /api/create-task
+   - Input: {title, due_date (optional), priority (optional: "High"/"Medium"/"Low")}
+   - Creates page in Notion Tasks database
+   - Sets properties:
+     * Name: title
+     * Due Date: due_date
+     * Priority: [priority as multi_select]
+     * Status: "Not started"
+   - Output: {success: true, message: "✅ Task created", task_id: "..."}
+   - Errors: {success: false, error: "description"}
+
+   GET /api/get-tasks
+   - Returns all tasks from Notion database
+   - Categorizes into:
+     * overdue: due_date < today
+     * outstanding: today <= due_date <= today + 7 days
+     * todo: due_date > today + 7 days OR no due_date
+   - Output: {
+       success: true,
+       tasks: [...all task details...],
+       categorized: {
+         overdue: [...],
+         outstanding: [...],
+         todo: [...]
+       }
+     }
+
+   POST /api/update-task
+   - Input: {task_id, title (optional), status (optional), priority (optional), due_date (optional)}
+   - Updates task in Notion
+   - Output: {success: true, message: "✅ Task updated"}
+
+   POST /api/delete-task
+   - Input: {task_id}
+   - Archives task in Notion (sets archived: true)
+   - Output: {success: true, message: "✅ Task deleted"}
+
+   POST /api/process-chat
+   - Input: {message: "user input"}
+   - Parse and process natural language commands:
+     * Detect task creation: extract title, due_date, priority
+     * Detect task updates: identify which task, what changed
+     * Detect calendar queries: check /api/get-tasks for availability
+     * Detect briefing requests: call /api/generate-briefing
+   - Route to appropriate handler
+   - Output: {
+       success: true,
+       response: "bot message to display",
+       action_taken: "description",
+       data: {...relevant data...}
+     }
+
+   POST /api/generate-briefing
+   - No input required (or optional date parameter)
+   - Fetch latest news from:
+     * AI & Technology sources (TechCrunch, ArXiv, The Verge, etc.)
+     * Business & Markets sources (Financial Times, Bloomberg, McKinsey, etc.)
+   - Generate 6 articles per category
+   - For each article:
+     * Title
+     * Publication source
+     * Date
+     * Enriched summary (2-3 sentences with business impact)
+     * Key data points or metrics
+     * Source link
+   - Output: {
+       success: true,
+       briefing: {
+         generated_at: "timestamp",
+         ai_tech: [...articles...],
+         business_markets: [...articles...]
+       }
+     }
+
+   GET /api/get-calendar
+   - Prepare for calendar integration
+   - For now, return mock calendar data:
+     * Today's events (mock)
+     * Tomorrow's events (mock)
+   - Output: {
+       success: true,
+       today: {date: "...", events: [...]},
+       tomorrow: {date: "...", events: [...]}
+     }
+
+4. News/Briefing Logic:
+   - Use web search or news API to fetch latest articles
+   - Categories: AI & Technology, Business & Markets
+   - Filter for relevance and recency
+   - Generate 2-3 sentence enriched summaries with:
+     * Business impact
+     * Key metrics
+     * Market implications
+     * Actionable insights
+   - Include publication, date, source link
+
+FRONTEND-BACKEND INTEGRATION:
+
+1. On page load:
+   - Fetch /api/get-tasks
+   - Display tasks in dashboard
+   - Fetch /api/get-calendar
+   - Display calendar events
+   - Show last briefing timestamp
+
+2. Chat interaction:
+   - User types message, clicks Send
+   - Send POST /api/process-chat with message
+   - Receive bot response + any data
+   - Update dashboard in real-time if tasks/events changed
+   - Show action confirmation in chat
+
+3. Real-time updates:
+   - After creating/updating/deleting task: refresh task list
+   - Show loading states while processing
+   - Error messages in chat if operations fail
+
+DATA PERSISTENCE:
+
+- All data stored in Notion (single source of truth)
+- Dashboard reflects live Notion data
+- No local storage needed
+- Real-time sync between operations
+
+STYLING REQUIREMENTS:
+
+- Dark mode with gradient background
+- Glassmorphic cards with backdrop blur
+- Smooth transitions (300ms default)
+- Color-coded priorities:
+  * High: Red (#ff6464)
+  * Medium: Orange (#ffb464)
+  * Low: Green (#64ff64)
+- Status indicators:
+  * Overdue: Red
+  * Outstanding: Orange
+  * To-Do: Blue
+- Professional typography
+- Responsive layout (works on different screen sizes)
+- Hover effects on interactive elements
+
+DEPLOYMENT:
+
+- Run on default Replit port (5000)
+- Accessible via Replit's public URL
+- No external dependencies beyond Flask, requests, and CORS
+- All assets served from Flask (no external CDNs except fonts)
+
+PRIORITIES FOR MVP:
+
+1. Core functionality first:
+   - Task CRUD operations working
+   - Chat interface functional
+   - Calendar view displaying
+
+2. Then add beauty:
+   - Styling and animations
+   - Polish UI details
+   - Optimize colors and spacing
+
+3. Finally optimize:
+   - Performance
+   - Error handling
+   - Edge cases
+
+Build this as a complete, working MVP that Tarinder can immediately use to manage daily tasks, view calendar, chat about his schedule, and read daily tech & business briefing.

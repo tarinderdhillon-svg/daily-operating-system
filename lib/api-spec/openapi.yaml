@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Daily Operating System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: tasks
+    description: Task management via Notion
+  - name: calendar
+    description: Calendar operations
+  - name: briefing
+    description: Daily briefing generation
+  - name: chat
+    description: AI chat assistant
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,135 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /tasks:
+    get:
+      operationId: getTasks
+      tags: [tasks]
+      summary: Get all tasks categorized
+      responses:
+        "200":
+          description: Tasks list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TasksResponse"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskBody"
+      responses:
+        "200":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskActionResponse"
+
+  /tasks/{taskId}:
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update an existing task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskBody"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskActionResponse"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskActionResponse"
+
+  /calendar:
+    get:
+      operationId: getCalendar
+      tags: [calendar]
+      summary: Get today and tomorrow's calendar events
+      responses:
+        "200":
+          description: Calendar events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalendarResponse"
+
+  /briefing:
+    get:
+      operationId: getBriefing
+      tags: [briefing]
+      summary: Get or generate daily briefing
+      responses:
+        "200":
+          description: Daily briefing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BriefingResponse"
+    post:
+      operationId: generateBriefing
+      tags: [briefing]
+      summary: Trigger briefing generation
+      responses:
+        "200":
+          description: Generated briefing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BriefingResponse"
+
+  /chat:
+    post:
+      operationId: processChat
+      tags: [chat]
+      summary: Process chat message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatBody"
+      responses:
+        "200":
+          description: Chat response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +167,188 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        due_date:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [High, Medium, Low]
+          nullable: true
+        status:
+          type: string
+          nullable: true
+      required: [id, title]
+
+    TasksResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        categorized:
+          type: object
+          properties:
+            overdue:
+              type: array
+              items:
+                $ref: "#/components/schemas/Task"
+            outstanding:
+              type: array
+              items:
+                $ref: "#/components/schemas/Task"
+            todo:
+              type: array
+              items:
+                $ref: "#/components/schemas/Task"
+          required: [overdue, outstanding, todo]
+      required: [success, tasks, categorized]
+
+    CreateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+        due_date:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [High, Medium, Low]
+          nullable: true
+      required: [title]
+
+    UpdateTaskBody:
+      type: object
+      properties:
+        title:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        priority:
+          type: string
+          enum: [High, Medium, Low]
+          nullable: true
+        due_date:
+          type: string
+          nullable: true
+
+    TaskActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        task_id:
+          type: string
+          nullable: true
+      required: [success, message]
+
+    CalendarEvent:
+      type: object
+      properties:
+        time:
+          type: string
+        title:
+          type: string
+        duration:
+          type: string
+          nullable: true
+      required: [time, title]
+
+    CalendarDay:
+      type: object
+      properties:
+        date:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalendarEvent"
+      required: [date, events]
+
+    CalendarResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        today:
+          $ref: "#/components/schemas/CalendarDay"
+        tomorrow:
+          $ref: "#/components/schemas/CalendarDay"
+      required: [success, today, tomorrow]
+
+    BriefingArticle:
+      type: object
+      properties:
+        title:
+          type: string
+        source:
+          type: string
+        date:
+          type: string
+        summary:
+          type: string
+        key_metrics:
+          type: string
+          nullable: true
+        link:
+          type: string
+      required: [title, source, date, summary, link]
+
+    BriefingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        briefing:
+          type: object
+          properties:
+            generated_at:
+              type: string
+            ai_tech:
+              type: array
+              items:
+                $ref: "#/components/schemas/BriefingArticle"
+            business_markets:
+              type: array
+              items:
+                $ref: "#/components/schemas/BriefingArticle"
+          required: [generated_at, ai_tech, business_markets]
+          nullable: true
+      required: [success]
+
+    ChatBody:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    ChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        response:
+          type: string
+        action_taken:
+          type: string
+          nullable: true
+        data:
+          nullable: true
+      required: [success, response]

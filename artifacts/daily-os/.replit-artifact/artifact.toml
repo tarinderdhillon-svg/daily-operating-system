@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Daily Operating System"
+version = "1.0.0"
+id = "artifacts/daily-os"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18238
+
+[services.development]
+run = "pnpm --filter @workspace/daily-os run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/daily-os", "run", "build" ]
+publicDir = "artifacts/daily-os/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18238"
+BASE_PATH = "/"

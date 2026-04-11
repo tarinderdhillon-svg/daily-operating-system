@@ -15,6 +15,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **AI**: OpenAI via Replit AI Integrations (gpt-5-nano for chat/briefing)
 
 ## Key Commands
 
@@ -25,3 +26,29 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Daily Operating System App
+
+### Features
+- **Task Management**: Full CRUD via Notion API (database ID: 3356990a287981128f2ffe49ada5e44f)
+- **Calendar View**: Today/tomorrow schedule (currently mock data, ready for Outlook integration)
+- **AI Chat**: Natural language task management, schedule queries, priority analysis
+- **Daily Briefing**: AI-generated tech & business news (6 articles per category)
+
+### Artifacts
+- `artifacts/daily-os` — React + Vite frontend (preview path: `/`)
+- `artifacts/api-server` — Express backend (preview path: `/api`)
+
+### Backend Routes
+- `GET /api/tasks` — all tasks categorized (overdue, outstanding, todo)
+- `POST /api/tasks` — create task in Notion
+- `PATCH /api/tasks/:id` — update task
+- `DELETE /api/tasks/:id` — delete (archive) task
+- `GET /api/calendar` — today/tomorrow events
+- `GET /api/briefing` — get cached briefing
+- `POST /api/briefing` — generate new AI briefing
+- `POST /api/chat` — process natural language commands
+
+### External Integrations
+- Notion API key stored in code (ntn_2833...)
+- OpenAI via Replit AI Integrations (env: AI_INTEGRATIONS_OPENAI_BASE_URL, AI_INTEGRATIONS_OPENAI_API_KEY)
