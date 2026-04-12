@@ -21,15 +21,15 @@ const CATEGORY_WEIGHTS: Record<string, number> = {
 const SYSTEM_PROMPT = `You are an elite AI consulting mentor delivering daily lessons to a senior consultant. Your goal is to build consulting-level AI expertise through precise, business-focused teaching.
 
 STRICT RULES:
-- Always deliver exactly the 7-section structure below — no more, no less
-- Write 600-800 words total across sections 1-6 (section 7 is a link only)
+- Always deliver exactly the 6-section structure below — no more, no less
+- Write 600-800 words total across all sections
 - Use second-person perspective ("You should...", "Your clients...")
 - Write like a confident senior partner — direct, no hedging, no "might" or "could"
 - Use recognizable companies and concrete metrics as examples
 - Connect every concept to real client value, not academic theory
 - No disclaimers, no meta-commentary, never say "as an AI"
 
-7-SECTION STRUCTURE (use these exact headers):
+6-SECTION STRUCTURE (use these exact headers):
 ## [Concept Name]
 **Category:** [category] | **Difficulty:** [difficulty]
 
@@ -49,10 +49,7 @@ STRICT RULES:
 [One clear question in plain language that tests understanding, not memorization. Answer in 1-2 sentences.]
 
 ### 6. Practical Takeaway
-[One concrete action the reader can take today or this week]
-
-### 7. Watch & Learn
-[Provide a YouTube search URL for a 5-15 minute explainer video on this concept. Format EXACTLY as a markdown link: [Search YouTube: {specific descriptive query}](https://www.youtube.com/results?search_query={url-encoded-query}). The query should be specific enough to find a clear tutorial or explainer, e.g. "RAG retrieval augmented generation explained", "transformer attention mechanism tutorial". URL-encode spaces as + signs.]`;
+[One concrete action the reader can take today or this week]`;
 
 interface NotionPage {
   id: string;
@@ -135,20 +132,120 @@ function selectNextConcept(history: NotionPage[]): typeof curriculumData.concept
   return weightedPool[Math.floor(Math.random() * weightedPool.length)];
 }
 
+/**
+ * Curated, highly-targeted YouTube search queries per concept slug.
+ * Each query is designed to surface the canonical educational video as the first result.
+ * Display title is shown as the link text.
+ */
+const YOUTUBE_CONCEPT_MAP: Record<string, { query: string; label: string }> = {
+  "supervised-learning":        { query: "supervised learning explained statquest machine learning fundamentals", label: "Supervised Learning Explained — StatQuest" },
+  "embeddings":                 { query: "word embeddings explained visual guide neural network", label: "Embeddings Explained — Visual Guide" },
+  "transformer-architecture":   { query: "but what is a GPT visual intro transformer 3blue1brown", label: "What is a GPT? Visual Intro to Transformers — 3Blue1Brown" },
+  "attention-mechanism":        { query: "attention in transformers visually explained 3blue1brown", label: "Attention in Transformers, Visually Explained — 3Blue1Brown" },
+  "gradient-descent":           { query: "gradient descent how neural networks learn 3blue1brown", label: "Gradient Descent, How Neural Networks Learn — 3Blue1Brown" },
+  "transfer-learning":          { query: "transfer learning explained deep learning tutorial beginner", label: "Transfer Learning Explained — DeepLearningAI" },
+  "neural-network-fundamentals":{ query: "but what is a neural network 3blue1brown chapter 1", label: "But What Is a Neural Network? — 3Blue1Brown" },
+  "overfitting-regularization": { query: "overfitting and regularization machine learning statquest explained", label: "Overfitting and Regularization Explained — StatQuest" },
+  "cross-validation":           { query: "cross validation explained statquest machine learning", label: "Cross-Validation Explained — StatQuest" },
+  "feature-engineering":        { query: "feature engineering machine learning tutorial data science explained", label: "Feature Engineering for Machine Learning — Tutorial" },
+  "reinforcement-learning":     { query: "reinforcement learning explained simple introduction markov decision process", label: "Reinforcement Learning Explained — Visual Introduction" },
+  "unsupervised-learning":      { query: "unsupervised learning explained clustering dimensionality reduction tutorial", label: "Unsupervised Learning Explained — Full Overview" },
+  "tokenization":               { query: "tokenization large language models explained how LLMs tokenize text", label: "Tokenization in LLMs Explained — Andrej Karpathy" },
+  "rag":                        { query: "retrieval augmented generation RAG explained IBM technology tutorial", label: "What is RAG? Retrieval-Augmented Generation — IBM Technology" },
+  "function-calling":           { query: "function calling LLM explained openai tools tutorial", label: "LLM Function Calling Explained — Step-by-Step Tutorial" },
+  "llm-evals":                  { query: "LLM evaluation metrics explained how to evaluate language models", label: "LLM Evaluation — How to Measure AI Performance" },
+  "hallucinations-grounding":   { query: "AI hallucinations explained how to reduce grounding LLMs", label: "AI Hallucinations Explained — Causes and Fixes" },
+  "structured-outputs":         { query: "structured outputs JSON mode LLM function calling explained", label: "Structured Outputs from LLMs Explained — Tutorial" },
+  "prompt-engineering":         { query: "prompt engineering guide best practices techniques explained", label: "Prompt Engineering Full Guide — Best Practices" },
+  "chain-of-thought":           { query: "chain of thought prompting explained reasoning LLM tutorial", label: "Chain-of-Thought Prompting Explained — Google Brain" },
+  "rlhf-fine-tuning":           { query: "RLHF reinforcement learning human feedback fine tuning explained ChatGPT", label: "RLHF Explained — How ChatGPT is Trained" },
+  "context-windows":            { query: "context window length LLM explained long context transformers tutorial", label: "Context Windows in LLMs Explained — Full Guide" },
+  "system-prompts":             { query: "system prompt personas LLM explained guide best practices", label: "System Prompts and Personas Explained — LLM Guide" },
+  "ai-agents":                  { query: "AI agents explained autonomous AI systems tutorial 2024", label: "AI Agents Explained — How Autonomous AI Works" },
+  "multimodal-ai":              { query: "multimodal AI explained vision language models GPT-4V tutorial", label: "Multimodal AI Explained — Vision + Language Models" },
+  "computer-use":               { query: "AI computer use browser automation agents explained Claude demo", label: "AI Computer Use Explained — Claude and Browser Agents" },
+  "model-routing":              { query: "LLM model routing cascades explained cost efficiency AI systems", label: "Model Routing and Cascades in AI Systems Explained" },
+  "mixture-of-experts":         { query: "mixture of experts MoE explained Mistral sparse gating tutorial", label: "Mixture of Experts (MoE) Explained — Sparse Gating" },
+  "ai-governance":              { query: "AI governance risk management explained enterprise responsible AI", label: "AI Governance and Risk Explained — Enterprise Guide" },
+  "measuring-ai-roi":           { query: "measuring AI ROI return on investment business value AI projects", label: "Measuring AI ROI — Business Value Framework" },
+  "ai-adoption-barriers":       { query: "AI adoption barriers challenges enterprise implementation explained", label: "AI Adoption Barriers in Enterprise — Full Breakdown" },
+  "human-in-the-loop":         { query: "human in the loop AI HITL explained machine learning design patterns", label: "Human-in-the-Loop AI Explained — Design Patterns" },
+};
+
+/**
+ * Return a YouTube search URL for the concept.
+ * Uses a curated, highly-targeted query if available, otherwise a generic search.
+ * If the YouTube Data API is enabled on the GOOGLE_API_KEY project, upgrades to a direct video link.
+ */
+async function fetchYouTubeVideo(conceptSlug: string, conceptName: string): Promise<{ title: string; url: string }> {
+  const curated = YOUTUBE_CONCEPT_MAP[conceptSlug];
+  const searchQuery = curated?.query ?? `${conceptName} explained tutorial`;
+  const displayLabel = curated?.label ?? `${conceptName} — Educational Overview`;
+
+  // Try YouTube Data API v3 for a direct video link (requires YouTube API enabled on the Google Cloud project)
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (apiKey) {
+    try {
+      const params = new URLSearchParams({
+        key:               apiKey,
+        q:                 searchQuery,
+        type:              "video",
+        videoDuration:     "medium",
+        videoEmbeddable:   "true",
+        order:             "relevance",
+        relevanceLanguage: "en",
+        maxResults:        "5",
+        part:              "snippet",
+      });
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+      if (res.ok) {
+        const data = await res.json() as {
+          items?: Array<{ id: { videoId?: string }; snippet: { title: string; channelTitle: string } }>
+        };
+        const item = (data.items ?? []).find(i => i.id?.videoId);
+        if (item?.id?.videoId) {
+          return {
+            title: `${item.snippet.title} — ${item.snippet.channelTitle}`,
+            url:   `https://www.youtube.com/watch?v=${item.id.videoId}`,
+          };
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  // Fallback: highly-targeted YouTube search URL
+  const q = encodeURIComponent(searchQuery).replace(/%20/g, "+");
+  return {
+    title: displayLabel,
+    url:   `https://www.youtube.com/results?search_query=${q}`,
+  };
+}
+
 async function generateLesson(concept: typeof curriculumData.concepts[0]): Promise<string> {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    max_tokens: 1200,
-    temperature: 0.7,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Generate today's lesson for: **${concept.name}**\nCategory: ${concept.category}\nDifficulty: ${concept.difficulty}`,
-      },
-    ],
-  });
-  return completion.choices[0]?.message?.content ?? "";
+  const [completion, video] = await Promise.all([
+    openai.chat.completions.create({
+      model: "gpt-4o",
+      max_tokens: 1400,
+      temperature: 0.7,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Generate today's lesson for: **${concept.name}**\nCategory: ${concept.category}\nDifficulty: ${concept.difficulty}`,
+        },
+      ],
+    }),
+    fetchYouTubeVideo(concept.slug, concept.name),
+  ]);
+
+  const lesson = completion.choices[0]?.message?.content ?? "";
+
+  // Append Watch & Learn section with a real YouTube video link
+  const watchSection = `\n\n### 7. Watch & Learn\n[${video.title}](${video.url})`;
+
+  return lesson + watchSection;
 }
 
 function chunkText(text: string, maxLen = 1990): Array<{ text: { content: string } }> {

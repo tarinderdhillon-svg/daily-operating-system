@@ -41,12 +41,12 @@ const AI_TECH_TOPICS = [
 ];
 
 const BUSINESS_TOPICS = [
-  "Global stock market performance: S&P 500, FTSE 100, major indices today",
-  "UK or US economy: inflation, interest rates, Bank of England or Federal Reserve news",
-  "Major company earnings report or CEO announcement this week",
-  "Global trade, tariffs, or geopolitics impacting business and markets",
-  "Energy prices, commodities, or oil market news this week",
-  "UK business news: major company, hiring, investment, or economic policy announcement",
+  "Biggest trending global business story this week — widely reported by Reuters, Bloomberg, FT, or BBC",
+  "Stock market movement or major index performance today — S&P 500, FTSE 100, Dow Jones or Nasdaq",
+  "Major economy news: inflation data, interest rate decision, GDP report or jobs figures",
+  "Big corporate story: CEO announcement, company restructure, major layoffs or hiring surge",
+  "Consumer trend, retail, or spending behaviour story that is broadly trending this week",
+  "Global trade, tariffs, supply chain or geopolitical event impacting business this week",
 ];
 
 async function generateArticleWithGrounding(
