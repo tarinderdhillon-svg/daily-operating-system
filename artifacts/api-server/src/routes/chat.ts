@@ -206,21 +206,9 @@ router.post("/", async (req, res): Promise<void> => {
         related_project: existing.related_project ?? supplement.related_project,
       };
 
-      if (userReply.toLowerCase().includes("skip")) {
-        const taskId = await createNotionTask(merged);
-        res.json({
-          success: true,
-          response: `Done! Task "${merged.title}" has been created${merged.due_date ? ` (due ${merged.due_date})` : ""}${merged.priority ? `, ${merged.priority} priority` : ""}${merged.status ? `, status: ${normaliseStatus(merged.status)}` : ""}.`,
-          action_taken: "task_created",
-          data: { task_id: taskId, title: merged.title },
-        });
-        return;
-      }
-
       const isNoneAnswer = (v: string | null) =>
-        !!v && ["none", "n/a", "skip", "no notes", "no priority", "no status", "no project"].includes(v.toLowerCase().trim());
+        !!v && ["none", "n/a", "skip", "no notes", "no priority", "no status", "no project", "—"].includes(v.toLowerCase().trim());
 
-      // also catch raw-text "notes none / no notes / notes n/a" etc.
       const replyLower = userReply.toLowerCase();
       const rawNoneNotes   = /\bnotes?\s*:?\s*(none|n\/a|no|nothing|skip)\b/.test(replyLower);
       const rawNoneProject = /\b(no project|project\s*:?\s*(none|n\/a|no|nothing|skip)|none\s+project)\b/.test(replyLower);
@@ -230,27 +218,16 @@ router.post("/", async (req, res): Promise<void> => {
       if (isNoneAnswer(supplement.status))                      merged.status          = null;
       if (isNoneAnswer(supplement.related_project) || rawNoneProject) merged.related_project = "";
 
-      // Only block on the essentials — status/notes/project default silently
-      const stillMissing: string[] = [];
-      if (!merged.due_date) stillMissing.push("due_date");
-      if (!merged.priority) stillMissing.push("priority");
-
-      if (stillMissing.length > 0) {
-        const labels: Record<string, string> = { due_date: "due date", priority: "priority (Urgent/High/Medium/Low)" };
-        const labelList = stillMissing.map(f => `• ${labels[f] ?? f}`).join("\n");
-        res.json({
-          success: true,
-          response: `Almost there — just fill in the remaining details below:\n\n${labelList}\n\nOr say "skip" to create now with defaults.`,
-          action_taken: "task_pending",
-          data: { ...merged, missing_fields: stillMissing },
-        });
-        return;
-      }
-
+      // All fields are optional — create the task with whatever was provided
       const taskId = await createNotionTask(merged);
+      const details = [
+        merged.due_date ? `due ${merged.due_date}` : null,
+        merged.priority ? `${merged.priority} priority` : null,
+        merged.status ? `status: ${normaliseStatus(merged.status)}` : "status: Not started",
+      ].filter(Boolean).join(", ");
       res.json({
         success: true,
-        response: `Task created: "${merged.title}" — due ${merged.due_date}, ${merged.priority} priority, status: ${normaliseStatus(merged.status)}.`,
+        response: `Task created: "${merged.title}"${details ? ` — ${details}` : ""}.`,
         action_taken: "task_created",
         data: { task_id: taskId, title: merged.title },
       });
@@ -271,24 +248,25 @@ router.post("/", async (req, res): Promise<void> => {
           success: true,
           response: "I'd like to create a task for you. Fill in the details below:",
           action_taken: "task_pending",
-          data: { title: null, due_date: null, priority: null, status: null, notes: null, missing_fields: ["title", "due_date", "priority"] },
+          data: { title: null, due_date: null, priority: null, status: null, notes: null, related_project: null, missing_fields: ["title", "due_date", "priority", "status", "notes", "related_project"] },
         });
         return;
       }
 
-      // Only block on essentials — status/notes/project get silent defaults
-      const missing: string[] = [];
-      if (!extracted.due_date) missing.push("due_date");
-      if (!extracted.priority) missing.push("priority");
+      // Always show all optional fields so the user can fill everything in one go
+      const missingOptional: string[] = [];
+      if (!extracted.due_date)        missingOptional.push("due_date");
+      if (!extracted.priority)        missingOptional.push("priority");
+      if (!extracted.status)          missingOptional.push("status");
+      if (!extracted.notes)           missingOptional.push("notes");
+      if (!extracted.related_project) missingOptional.push("related_project");
 
-      if (missing.length > 0) {
-        const labels: Record<string, string> = { due_date: "due date", priority: "priority (Urgent/High/Medium/Low)" };
-        const labelList = missing.map(f => `• ${labels[f] ?? f}`).join("\n");
+      if (missingOptional.length > 0) {
         res.json({
           success: true,
-          response: `Got it — creating **"${extracted.title}"**. Just need:\n\n${labelList}\n\nFill in below, or say "skip" to create now with defaults.`,
+          response: `Got it — creating **"${extracted.title}"**. Fill in the details below (all optional — leave any blank to use defaults):`,
           action_taken: "task_pending",
-          data: { ...extracted, missing_fields: missing },
+          data: { ...extracted, missing_fields: missingOptional },
         });
         return;
       }

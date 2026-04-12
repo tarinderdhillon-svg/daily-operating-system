@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
   BookOpen, Sparkles, RefreshCw, RotateCcw, Send, CheckCircle2,
-  ChevronDown, ChevronUp, Loader2, Volume2, Pause, Square,
+  ChevronDown, ChevronUp, Loader2, Volume2, Pause, Square, Youtube,
 } from "lucide-react";
 
 interface LessonState {
@@ -25,10 +25,47 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
+function renderInlineMarkdown(text: string, key: number): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  const combined = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)|\*\*([^*]+)\*\*/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = combined.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    if (match[0].startsWith("[")) {
+      const isYouTube = match[2].includes("youtube.com");
+      parts.push(
+        <a
+          key={`link-${match.index}`}
+          href={match[2]}
+          target="_blank"
+          rel="noreferrer"
+          className={`inline-flex items-center gap-1 font-medium underline underline-offset-2 transition-colors ${
+            isYouTube
+              ? "text-red-400 hover:text-red-300"
+              : "text-indigo-400 hover:text-indigo-300"
+          }`}
+        >
+          {isYouTube && <Youtube size={12} className="flex-shrink-0" />}
+          {match[1]}
+        </a>
+      );
+    } else {
+      parts.push(<strong key={`bold-${match.index}`} className="text-white font-semibold">{match[3]}</strong>);
+    }
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+
+  return <React.Fragment key={key}>{parts}</React.Fragment>;
+}
+
 function formatLesson(text: string): React.ReactNode {
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   let key = 0;
+  let inWatchLearn = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -38,15 +75,21 @@ function formatLesson(text: string): React.ReactNode {
     }
 
     if (trimmed.startsWith("## ")) {
+      inWatchLearn = false;
       elements.push(
         <h2 key={key++} className="text-lg font-bold text-white mt-1 mb-1 leading-tight">
           {trimmed.replace(/^## /, "")}
         </h2>
       );
     } else if (trimmed.startsWith("### ")) {
+      const heading = trimmed.replace(/^### /, "");
+      inWatchLearn = heading.toLowerCase().includes("watch");
       elements.push(
-        <h3 key={key++} className="text-sm font-semibold text-indigo-300 mt-4 mb-1.5 uppercase tracking-wider">
-          {trimmed.replace(/^### /, "")}
+        <h3 key={key++} className={`text-sm font-semibold mt-4 mb-1.5 uppercase tracking-wider ${
+          inWatchLearn ? "text-red-400 flex items-center gap-1.5" : "text-indigo-300"
+        }`}>
+          {inWatchLearn && <Youtube size={13} />}
+          {heading}
         </h3>
       );
     } else if (trimmed.startsWith("**Category:**") || trimmed.startsWith("**Difficulty:**")) {
@@ -56,14 +99,10 @@ function formatLesson(text: string): React.ReactNode {
         </p>
       );
     } else {
-      const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
+      const node = renderInlineMarkdown(trimmed, key++);
       elements.push(
         <p key={key++} className="text-sm text-slate-300 leading-relaxed mb-1">
-          {parts.map((part, i) =>
-            part.startsWith("**") && part.endsWith("**")
-              ? <strong key={i} className="text-white font-semibold">{part.replace(/\*\*/g, "")}</strong>
-              : part
-          )}
+          {node}
         </p>
       );
     }

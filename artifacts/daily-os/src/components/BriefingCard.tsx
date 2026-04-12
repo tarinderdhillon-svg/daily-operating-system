@@ -26,23 +26,18 @@ export function BriefingCard() {
 
   if (!briefing) {
     return (
-      <div className="bento-card rounded-3xl p-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-            <Sparkles className="h-4 w-4 text-indigo-400" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-2">
-              Daily Briefing
-              <span className="text-[10px] font-medium bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full">AI Generated</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">No briefing yet — generate one to get started</p>
-          </div>
+      <div className="bento-card rounded-3xl p-5 flex items-center gap-4">
+        <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+          <Sparkles className="h-4 w-4 text-indigo-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider">Daily Briefing</h2>
+          <p className="text-xs text-slate-500 mt-0.5">No briefing yet — press Generate to get today's news</p>
         </div>
         <button
           onClick={handleGenerate}
           disabled={generateBriefing.isPending}
-          className="shrink-0 bg-indigo-600/80 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium transition-all disabled:opacity-50 flex items-center gap-1.5"
+          className="shrink-0 bg-indigo-600/80 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 flex items-center gap-1.5"
         >
           {generateBriefing.isPending ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
           {generateBriefing.isPending ? "Generating…" : "Generate"}
@@ -60,15 +55,15 @@ export function BriefingCard() {
       <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/20 to-purple-500/0 blur-2xl rounded-full translate-x-1/2 -translate-y-1/2 pointer-events-none" />
 
       {/* Header row — always visible */}
-      <div className="flex items-start gap-3 p-5 pb-4 relative">
-        <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 mt-0.5">
+      <div className="flex items-center gap-3 p-5 pb-4 relative">
+        <div className="h-9 w-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
           <Sparkles className="h-4 w-4 text-indigo-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider">Daily Briefing</h2>
-            <span className="text-[10px] font-medium bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full">AI Generated</span>
-            <span className="text-[10px] text-slate-500 ml-1">
+            <span className="text-[10px] font-semibold bg-indigo-500/20 text-indigo-200 px-2 py-0.5 rounded-full border border-indigo-500/20">AI Generated</span>
+            <span className="text-[10px] text-slate-500">
               {format(parseISO(briefing.generated_at), "h:mm a")}
             </span>
           </div>
@@ -108,24 +103,25 @@ export function BriefingCard() {
           )}
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Controls — aligned with header row */}
+        <div className="flex items-center gap-1.5 shrink-0 self-start">
           <button
             onClick={handleGenerate}
             disabled={generateBriefing.isPending}
             title="Refresh briefing"
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-slate-300 transition-all disabled:opacity-40"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/10 text-slate-500 hover:text-slate-300 transition-all disabled:opacity-40 text-[11px] font-medium border border-white/[0.06]"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${generateBriefing.isPending ? "animate-spin text-indigo-400" : ""}`} />
+            <RefreshCw className={`h-3 w-3 ${generateBriefing.isPending ? "animate-spin text-indigo-400" : ""}`} />
+            <span className="hidden sm:inline">{generateBriefing.isPending ? "Generating…" : "Refresh"}</span>
           </button>
           <button
             onClick={() => setIsExpanded(v => !v)}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-500 hover:text-indigo-300 transition-all flex items-center gap-1 text-xs font-medium px-2"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/[0.05] hover:bg-white/10 text-slate-500 hover:text-indigo-300 transition-all text-[11px] font-medium border border-white/[0.06]"
           >
             {isExpanded ? (
-              <><ChevronUp className="h-3.5 w-3.5" /> Collapse</>
+              <><ChevronUp className="h-3 w-3" /><span className="hidden sm:inline">Collapse</span></>
             ) : (
-              <><ChevronDown className="h-3.5 w-3.5" /> Read full briefing</>
+              <><ChevronDown className="h-3 w-3" /><span className="hidden sm:inline">Full briefing</span></>
             )}
           </button>
         </div>

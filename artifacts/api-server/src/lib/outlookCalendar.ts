@@ -21,7 +21,7 @@ export interface GraphCalendarEvent {
 export async function getCalendarView(
   startDateTime: string,
   endDateTime:   string,
-  timeZone = "UTC",
+  timeZone = "Europe/London",
 ): Promise<GraphCalendarEvent[]> {
   // Create a fresh client per call — tokens may expire
   const connectors = new ReplitConnectors();

@@ -32,21 +32,21 @@ interface BriefingArticle {
 let cachedBriefing: CachedBriefing | null = null;
 
 const AI_TECH_TOPICS = [
-  "OpenAI latest model releases and GPT developments this week",
-  "Google DeepMind Gemini updates and AI research announcements",
-  "AI coding assistants and developer productivity tools (Cursor, GitHub Copilot, Claude)",
-  "NVIDIA and GPU computing: latest earnings, products, AI infrastructure",
-  "AI agents, autonomous systems and enterprise AI deployments",
-  "LLM research breakthroughs: multimodal, reasoning, open-source models",
+  "OpenAI or Anthropic or Google DeepMind major AI model release or announcement this week",
+  "AI coding tools and developer productivity: GitHub Copilot, Cursor, Claude latest news",
+  "NVIDIA GPU, AI chip, or semiconductor industry latest news",
+  "AI agents and enterprise AI deployment: major company announcements",
+  "LLM research breakthrough or open-source model release (Llama, Mistral, etc.)",
+  "Big Tech AI strategy: Microsoft, Google, Meta, Apple AI product news",
 ];
 
 const BUSINESS_TOPICS = [
-  "US stock market performance and S&P 500 today",
-  "Tech sector earnings, valuations and major analyst upgrades",
-  "AI startup funding rounds and venture capital deals this week",
-  "Federal Reserve interest rate decisions and inflation data",
-  "Semiconductor industry news: TSMC, Intel, AMD supply chain",
-  "Enterprise software M&A, IPOs and strategic partnerships",
+  "Global stock market performance: S&P 500, FTSE 100, major indices today",
+  "UK or US economy: inflation, interest rates, Bank of England or Federal Reserve news",
+  "Major company earnings report or CEO announcement this week",
+  "Global trade, tariffs, or geopolitics impacting business and markets",
+  "Energy prices, commodities, or oil market news this week",
+  "UK business news: major company, hiring, investment, or economic policy announcement",
 ];
 
 async function generateArticleWithGrounding(
@@ -76,7 +76,7 @@ async function generateArticleWithGrounding(
 
     const prompt = `Today is ${today}. Search for the most recent and significant news about: "${topic}"
 
-Find the single most important story from the past 7 days. Write a professional executive briefing in this JSON format:
+Find the single most important story from the past 7 days that has been widely reported by major, trusted outlets. Write a professional executive briefing in this JSON format:
 
 {
   "title": "Compelling specific headline under 85 characters — must reference real company/product/number",
@@ -86,7 +86,10 @@ Find the single most important story from the past 7 days. Write a professional 
   "source_url": "Direct URL to the actual article you are citing — must be a real, working URL from search results"
 }
 
-Requirements:
+STRICT SOURCE REQUIREMENTS:
+- Only use stories reported by these trusted, high-quality outlets: Reuters, Bloomberg, Financial Times, The Economist, TechCrunch, The Verge, Ars Technica, MIT Technology Review, Wired, Wall Street Journal, BBC News, or official company press releases/blogs
+- Do NOT use stories from opinion blogs, low-quality aggregators, or unverified sources
+- Prioritise stories that are genuinely trending and widely reported — not niche or obscure items
 - Use ONLY real information from search results — no fabricated facts
 - The source_url must be the actual article URL from your search results, not a homepage
 - Include specific company names, product names, dollar amounts, percentages where available
@@ -195,18 +198,8 @@ function isBriefingStale(briefing: CachedBriefing): boolean {
   return now >= cutoff && generated < cutoff;
 }
 
-router.get("/", async (req, res): Promise<void> => {
-  if (cachedBriefing) {
-    if (isBriefingStale(cachedBriefing)) {
-      req.log.info("Briefing stale — triggering background refresh");
-      buildBriefing()
-        .then(b  => { cachedBriefing = b; })
-        .catch(e => req.log.error({ err: e }, "Background briefing refresh failed"));
-    }
-    res.json({ success: true, briefing: cachedBriefing });
-    return;
-  }
-  res.json({ success: true, briefing: null });
+router.get("/", async (_req, res): Promise<void> => {
+  res.json({ success: true, briefing: cachedBriefing ?? null });
 });
 
 // How long before we allow a forced re-generation (6 hours)
