@@ -4,8 +4,9 @@ import { type IncomingMessage, type ServerResponse } from "http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
-// Use dynamic import for pino-http due to CommonJS/ESM interop issues
-const pinoHttp = require("pino-http");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pinoHttpModule = require("pino-http");
+const pinoHttp = (pinoHttpModule.default || pinoHttpModule) as (options: any) => any;
 
 const app: Express = express();
 
