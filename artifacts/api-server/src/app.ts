@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import { type IncomingMessage, type ServerResponse } from "http";
+import "./types"; // Type augmentation for pino-http
 import router from "./routes";
 import { logger } from "./lib/logger";
 
