@@ -5,6 +5,7 @@ import "./types"; // Type augmentation for pino-http
 import router from "./routes";
 import { logger } from "./lib/logger";
 
+// Use CommonJS require for pino-http due to ESM/CommonJS interop issues
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pinoHttpModule = require("pino-http");
 const pinoHttp = (pinoHttpModule.default || pinoHttpModule) as (options: any) => any;
