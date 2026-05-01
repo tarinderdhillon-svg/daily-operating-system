@@ -39,7 +39,7 @@ function parseTask(page: NotionTask) {
   return { id: page.id, title, due_date, priority, status, notes, project_id };
 }
 
-async function notionRequest(path: string, method = "GET", body?: object) {
+async function notionRequest<T = unknown>(path: string, method = "GET", body?: object): Promise<T> {
   const url = `https://api.notion.com/v1${path}`;
   const res = await fetch(url, {
     method,
@@ -50,18 +50,18 @@ async function notionRequest(path: string, method = "GET", body?: object) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = await res.json();
+  const json = (await res.json()) as T;
   if (!res.ok) throw new Error(`Notion API error ${res.status}: ${JSON.stringify(json)}`);
   return json;
 }
 
 router.get("/projects", async (req, res): Promise<void> => {
   try {
-    const data = await notionRequest(`/databases/${NOTION_PROJECTS_DB}/query`, "POST", {
+    const data = await notionRequest<{ results: Array<{ id: string; properties: { Name?: { title: Array<{ plain_text: string }> } } }> }>(`/databases/${NOTION_PROJECTS_DB}/query`, "POST", {
       page_size: 50,
       sorts: [{ property: "Name", direction: "ascending" }],
     });
-    const projects = (data.results as Array<{ id: string; properties: { Name?: { title: Array<{ plain_text: string }> } } }>).map(p => ({
+    const projects = data.results.map(p => ({
       id: p.id,
       name: p.properties?.Name?.title?.map(t => t.plain_text).join("") ?? "Untitled",
     }));
@@ -74,12 +74,12 @@ router.get("/projects", async (req, res): Promise<void> => {
 
 router.get("/", async (req, res): Promise<void> => {
   try {
-    const data = await notionRequest(`/databases/${NOTION_DB_ID}/query`, "POST", {
+    const data = await notionRequest<{ results: NotionTask[] }>(`/databases/${NOTION_DB_ID}/query`, "POST", {
       page_size: 100,
       sorts: [{ property: "Due Date", direction: "ascending" }],
     });
 
-    const allTasks = (data.results as NotionTask[]).map(parseTask);
+    const allTasks = data.results.map(parseTask);
     const completed  = allTasks.filter(t => DONE_STATUSES.has((t.status ?? "").toLowerCase()));
     const activeTasks = allTasks.filter(t => !DONE_STATUSES.has((t.status ?? "").toLowerCase()));
 
@@ -139,7 +139,7 @@ router.post("/", async (req, res): Promise<void> => {
     if (notes)       properties["Notes"]           = { rich_text: [{ text: { content: notes } }] };
     if (project_id)  properties["Related Project"] = { relation: [{ id: project_id }] };
 
-    const page = await notionRequest("/pages", "POST", {
+    const page = await notionRequest<{ id: string }>("/pages", "POST", {
       parent: { database_id: NOTION_DB_ID },
       properties,
     });

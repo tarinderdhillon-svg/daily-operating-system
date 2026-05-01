@@ -11,4 +11,6 @@ export interface CreateTaskBody {
   title: string;
   due_date?: string | null;
   priority?: CreateTaskBodyPriority;
+  status?: string | null;
+  notes?: string | null;
 }

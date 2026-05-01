@@ -64,7 +64,7 @@ interface NotionPage {
   };
 }
 
-async function notionRequest(path: string, method = "GET", body?: object) {
+async function notionRequest<T = unknown>(path: string, method = "GET", body?: object): Promise<T> {
   const res = await fetch(`https://api.notion.com/v1${path}`, {
     method,
     headers: {
@@ -74,17 +74,17 @@ async function notionRequest(path: string, method = "GET", body?: object) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = await res.json();
+  const json = (await res.json()) as T;
   if (!res.ok) throw new Error(`Notion ${res.status}: ${JSON.stringify(json)}`);
   return json;
 }
 
 async function getLearningHistory(): Promise<NotionPage[]> {
-  const data = await notionRequest(`/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
+  const data = await notionRequest<{ results: NotionPage[] }>(`/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
     page_size: 100,
     sorts: [{ property: "Date", direction: "descending" }],
   });
-  return data.results as NotionPage[];
+  return data.results;
 }
 
 function selectNextConcept(history: NotionPage[]): typeof curriculumData.concepts[0] {
@@ -262,7 +262,7 @@ async function saveToNotion(
   isRecap = false
 ): Promise<string> {
   const today = new Date().toISOString().split("T")[0];
-  const data = await notionRequest("/pages", "POST", {
+  const data = await notionRequest<{ id: string }>("/pages", "POST", {
     parent: { database_id: NOTION_LEARNING_DB_ID },
     properties: {
       Name: { title: [{ text: { content: concept.name } }] },
@@ -274,19 +274,19 @@ async function saveToNotion(
       "Is Recap": { checkbox: isRecap },
     },
   });
-  return data.id as string;
+  return data.id;
 }
 
 async function getTodaysConcept(): Promise<string | null> {
   const today = new Date().toISOString().split("T")[0];
-  const data = await notionRequest(`/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
+  const data = await notionRequest<{ results: NotionPage[] }>(`/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
     page_size: 10,
     filter: {
       property: "Date",
       date: { equals: today },
     },
   });
-  const pages = data.results as NotionPage[];
+  const pages = data.results;
   const todayPage = pages.find(p => !p.properties["Is Recap"]?.checkbox);
   if (!todayPage) return null;
   return todayPage.properties.Lesson?.rich_text?.map(t => t.plain_text).join("") ?? null;
@@ -402,12 +402,12 @@ router.post("/answer", async (req, res): Promise<void> => {
     }
 
     const today = new Date().toISOString().split("T")[0];
-    const data = await notionRequest(`/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
+    const data = await notionRequest<{ results: NotionPage[] }>(`/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
       page_size: 5,
       filter: { property: "Date", date: { equals: today } },
     });
 
-    const pages = data.results as NotionPage[];
+    const pages = data.results;
     const todayPage = pages.find(p => !p.properties["Is Recap"]?.checkbox);
 
     if (!todayPage) {

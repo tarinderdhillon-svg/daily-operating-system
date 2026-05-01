@@ -45,7 +45,7 @@ function normaliseStatus(raw: string | null | undefined): string | null {
   return VALID_STATUSES[raw.toLowerCase().trim()] ?? raw;
 }
 
-async function notionRequest(path: string, method = "GET", body?: object) {
+async function notionRequest<T = unknown>(path: string, method = "GET", body?: object): Promise<T> {
   const url = `https://api.notion.com/v1${path}`;
   const res = await fetch(url, {
     method,
@@ -56,13 +56,13 @@ async function notionRequest(path: string, method = "GET", body?: object) {
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = await res.json();
+  const json = (await res.json()) as T;
   if (!res.ok) throw new Error(`Notion error ${res.status}: ${JSON.stringify(json)}`);
   return json;
 }
 
 async function getTasksFromNotion() {
-  const data = await notionRequest(`/databases/${NOTION_DB_ID}/query`, "POST", { page_size: 100 });
+  const data = await notionRequest<{ results: Array<{ id: string; properties: Record<string, unknown> }> }>(`/databases/${NOTION_DB_ID}/query`, "POST", { page_size: 100 });
   return data.results.map((page: { id: string; properties: Record<string, unknown> }) => {
     const props = page.properties as {
       Name?: { title: Array<{ plain_text: string }> };
@@ -95,9 +95,9 @@ let projectsCache: Record<string, string> | null = null;
 async function getProjects(): Promise<Record<string, string>> {
   if (projectsCache) return projectsCache;
   try {
-    const data = await notionRequest(`/databases/${NOTION_PROJECTS_DB}/query`, "POST", { page_size: 50 });
+    const data = await notionRequest<{ results: Array<{ id: string; properties: Record<string, unknown> }> }>(`/databases/${NOTION_PROJECTS_DB}/query`, "POST", { page_size: 50 });
     const map: Record<string, string> = {};
-    for (const page of data.results as Array<{ id: string; properties: Record<string, unknown> }>) {
+    for (const page of data.results) {
       const props = page.properties as { Name?: { title: Array<{ plain_text: string }> } };
       const name = props?.Name?.title?.map((t) => t.plain_text).join("").trim();
       if (name) map[name.toLowerCase()] = page.id;
@@ -134,7 +134,7 @@ async function createNotionTask(fields: TaskFields) {
   const projectId = await resolveProjectId(fields.related_project);
   if (projectId) properties["Related Project"] = { relation: [{ id: projectId }] };
 
-  const page = await notionRequest("/pages", "POST", {
+  const page = await notionRequest<{ id: string }>("/pages", "POST", {
     parent: { database_id: NOTION_DB_ID },
     properties,
   });
@@ -192,7 +192,7 @@ router.post("/", async (req, res): Promise<void> => {
       const contextJson = parts[1] ?? "{}";
       const userReply   = parts.slice(2).join("|").replace(/^user_reply:/, "").trim();
 
-      let existing: TaskFields = { title: null, due_date: null, priority: null, status: null, notes: null };
+      let existing: TaskFields = { title: null, due_date: null, priority: null, status: null, notes: null, related_project: null };
       try { existing = JSON.parse(contextJson); } catch { /* ignore */ }
 
       const supplement = await extractTaskFields(userReply);

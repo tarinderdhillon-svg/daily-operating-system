@@ -37,6 +37,7 @@ export interface TasksResponse {
   success: boolean;
   tasks: Task[];
   categorized: TasksResponseCategorized;
+  completed?: Task[];
 }
 
 export type CreateTaskBodyPriority =
@@ -53,6 +54,8 @@ export interface CreateTaskBody {
   title: string;
   due_date?: string | null;
   priority?: CreateTaskBodyPriority;
+  status?: string | null;
+  notes?: string | null;
 }
 
 export type UpdateTaskBodyPriority =

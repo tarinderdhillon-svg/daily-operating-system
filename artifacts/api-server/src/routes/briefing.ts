@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type Tool } from "@google/generative-ai";
 
 const router = Router();
 
@@ -71,7 +71,7 @@ async function generateArticleWithGrounding(
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
     const searchModel = genAI.getGenerativeModel({
       model: BRIEFING_MODEL,
-      tools: [{ googleSearch: {} } as any],
+      tools: [{ googleSearch: {} } as Tool],
     });
 
     const prompt = `Today is ${today}. Search for the most recent and significant news about: "${topic}"
@@ -101,7 +101,8 @@ Return ONLY the JSON object, no markdown fences.`;
     const response = result.response;
 
     // Extract grounding metadata for real URLs
-    const groundingChunks = (response.candidates?.[0] as any)?.groundingMetadata?.groundingChunks ?? [];
+    const candidate = response.candidates?.[0];
+    const groundingChunks = candidate?.groundingMetadata?.groundingChunks ?? [];
     const firstGroundedChunk = groundingChunks[0];
     const groundedUrl   = firstGroundedChunk?.web?.uri ?? null;
     const groundedTitle = firstGroundedChunk?.web?.title ?? null;

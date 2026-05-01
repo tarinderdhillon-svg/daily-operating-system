@@ -39,14 +39,14 @@ export async function getCalendarView(
   const response = await connectors.proxy("outlook", endpoint, {
     method: "GET",
     headers: { Prefer: `outlook.timezone="${timeZone}"` },
-  });
+  }) as Response;
 
   if (!response.ok) {
-    const body = await (response as any).text().catch(() => "");
+    const body = await response.text().catch(() => "");
     throw new Error(`Microsoft Graph error ${response.status}: ${body}`);
   }
 
-  const data = await (response as any).json() as { value: GraphCalendarEvent[] };
+  const data = (await response.json()) as { value: GraphCalendarEvent[] };
   return (data.value ?? []).filter((e) => !e.isCancelled);
 }
 

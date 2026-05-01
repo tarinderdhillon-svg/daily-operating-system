@@ -12,4 +12,5 @@ export interface TasksResponse {
   success: boolean;
   tasks: Task[];
   categorized: TasksResponseCategorized;
+  completed?: Task[];
 }
