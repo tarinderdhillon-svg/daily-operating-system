@@ -10,9 +10,9 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
-const NOTION_API_KEY = "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";
-const NOTION_DB_ID   = "3356990a287981128f2ffe49ada5e44f";
-const NOTION_PROJECTS_DB = "3356990a-2879-8110-9d8f-db6ed7291219";
+const NOTION_API_KEY = process.env.NOTION_API_KEY || "";
+const NOTION_DB_ID   = process.env.TASKS_PAGE_ID || "";
+const NOTION_PROJECTS_DB = process.env.PROJECTS_PAGE_ID || "";
 const NOTION_VERSION = "2022-06-28";
 const DONE_STATUSES  = new Set(["done", "complete", "completed"]);
 const DHILLON_USER_ID = "335d872b-594c-8135-92ba-0002f74d1f33";

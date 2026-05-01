@@ -5,7 +5,7 @@ import curriculumData from "../data/curriculum.json" assert { type: "json" };
 
 const router = Router();
 
-const NOTION_API_KEY = "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";
+const NOTION_API_KEY = process.env.NOTION_API_KEY || "";
 const NOTION_LEARNING_DB_ID = "33f6990a-2879-81ed-8265-c369ca896b83";
 const NOTION_VERSION = "2022-06-28";
 
