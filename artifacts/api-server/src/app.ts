@@ -1,9 +1,11 @@
 import express, { type Express } from "express";
 import cors from "cors";
-import pinoHttp from "pino-http";
 import { type IncomingMessage, type ServerResponse } from "http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+
+// Use dynamic import for pino-http due to CommonJS/ESM interop issues
+const pinoHttp = require("pino-http");
 
 const app: Express = express();
 
