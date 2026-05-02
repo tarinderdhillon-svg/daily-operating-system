@@ -1,4 +1,3 @@
 {
-  "outputDirectory": "artifacts/api-server/dist",
-  "startCommand": "node --enable-source-maps ./index.mjs"
+  "outputDirectory": "artifacts/api-server/dist"
 }
