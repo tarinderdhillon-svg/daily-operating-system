@@ -1,0 +1,7 @@
+artifacts/daily-os
+artifacts/mockup-sandbox
+lib/api-client-react
+.canvas
+attached_assets
+fix_secrets.sh
+replit.md
