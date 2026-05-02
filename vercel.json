@@ -1,6 +1,3 @@
 {
-  "buildCommand": "pnpm run typecheck && pnpm -r --filter './artifacts/api-server' run build",
-  "installCommand": "pnpm install",
-  "outputDirectory": "artifacts/api-server/dist",
-  "framework": "express"
+  "outputDirectory": "artifacts/api-server/dist"
 }
