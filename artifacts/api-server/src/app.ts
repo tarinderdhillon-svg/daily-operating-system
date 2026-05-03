@@ -41,7 +41,7 @@ app.use(express.static(publicPath));
 app.use("/api", router);
 
 // Serve index.html for all non-API routes (for SPA routing)
-app.get("*", (req, res) => {
+app.get(/.*/, (req, res) => {
   const indexPath = path.join(publicPath, "index.html");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.sendFile(indexPath);
