@@ -1,7 +1,11 @@
 import { Router } from "express";
 import { OpenAI } from "openai";
 import { logger } from "../lib/logger";
-import curriculumData from "../data/curriculum.json" with { type: "json" };
+
+// Use require() for JSON in CommonJS context (not "type": "module")
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const curriculumData = require("../data/curriculum.json") as any;
+
 type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
 
 
@@ -102,7 +106,7 @@ function selectNextConcept(history: NotionPage[]): typeof curriculumData.concept
     const dateStr = page.properties.Date?.date?.start;
 
     const concept = curriculumData.concepts.find(
-      c => c.name.toLowerCase() === name.toLowerCase()
+      (c: any) => c.name.toLowerCase() === name.toLowerCase()
     );
     if (!concept) continue;
 
@@ -115,11 +119,11 @@ function selectNextConcept(history: NotionPage[]): typeof curriculumData.concept
   }
 
   const available = curriculumData.concepts.filter(
-    c => !masteredSlugs.has(c.slug) && !recentSlugs.has(c.slug)
+    (c: any) => !masteredSlugs.has(c.slug) && !recentSlugs.has(c.slug)
   );
 
   const pool = available.length > 0 ? available : curriculumData.concepts.filter(
-    c => !masteredSlugs.has(c.slug)
+    (c: any) => !masteredSlugs.has(c.slug)
   );
 
   if (pool.length === 0) return curriculumData.concepts[0];
