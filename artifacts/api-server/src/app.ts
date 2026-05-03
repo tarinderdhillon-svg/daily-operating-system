@@ -34,14 +34,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from public directory
-app.use(express.static(path.join(__dirname, "../public")));
+const publicPath = path.join(__dirname, "../public");
+app.use(express.static(publicPath));
 
 // API routes
 app.use("/api", router);
 
 // Serve index.html for all non-API routes (for SPA routing)
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/index.html"));
+  const indexPath = path.join(publicPath, "index.html");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.sendFile(indexPath);
 });
 
 export default app;
