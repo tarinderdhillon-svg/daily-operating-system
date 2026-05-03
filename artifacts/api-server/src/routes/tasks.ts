@@ -41,7 +41,7 @@ function parseTask(page: NotionTask) {
 
 async function notionRequest<T = unknown>(path: string, method = "GET", body?: object): Promise<T> {
   const url = `https://api.notion.com/v1${path}`;
-  const res = await fetch(url, {
+  const httpRes = await fetch(url, {
     method,
     headers: {
       Authorization: `Bearer ${NOTION_API_KEY}`,
@@ -50,8 +50,8 @@ async function notionRequest<T = unknown>(path: string, method = "GET", body?: o
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = (await res.json()) as T;
-  if (!res.ok) throw new Error(`Notion API error ${res.status}: ${JSON.stringify(json)}`);
+  const json = (await httpRes.json()) as T;
+  if (!httpRes.ok) throw new Error(`Notion API error ${httpRes.status}: ${JSON.stringify(json)}`);
   return json;
 }
 

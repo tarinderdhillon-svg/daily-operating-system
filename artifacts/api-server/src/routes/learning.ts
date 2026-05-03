@@ -65,7 +65,7 @@ interface NotionPage {
 }
 
 async function notionRequest<T = unknown>(path: string, method = "GET", body?: object): Promise<T> {
-  const res = await fetch(`https://api.notion.com/v1${path}`, {
+  const httpRes = await fetch(`https://api.notion.com/v1${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${NOTION_API_KEY}`,
@@ -74,8 +74,8 @@ async function notionRequest<T = unknown>(path: string, method = "GET", body?: o
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const json = (await res.json()) as T;
-  if (!res.ok) throw new Error(`Notion ${res.status}: ${JSON.stringify(json)}`);
+  const json = (await httpRes.json()) as T;
+  if (!httpRes.ok) throw new Error(`Notion ${httpRes.status}: ${JSON.stringify(json)}`);
   return json;
 }
 
@@ -197,9 +197,9 @@ async function fetchYouTubeVideo(conceptSlug: string, conceptName: string): Prom
         maxResults:        "5",
         part:              "snippet",
       });
-      const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
-      if (res.ok) {
-        const data = await res.json() as {
+      const httpRes = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+      if (httpRes.ok) {
+        const data = await httpRes.json() as {
           items?: Array<{ id: { videoId?: string }; snippet: { title: string; channelTitle: string } }>
         };
         const item = (data.items ?? []).find(i => i.id?.videoId);
