@@ -462,7 +462,7 @@ If you are not confident this is a task management command, return action: "not_
     // ─── CALENDAR ────────────────────────────────────────────────────────────
     if (lowerMsg.includes("schedule") || lowerMsg.includes("calendar") || lowerMsg.includes("tomorrow") || lowerMsg.includes("today")) {
       const isToday = !lowerMsg.includes("tomorrow");
-      const calendarRes = await fetch(`http://localhost:${process.env.PORT}/api/calendar`).catch(() => null);
+      const calendarRes = (await fetch(`http://localhost:${process.env.PORT}/api/calendar`).catch(() => null)) as (HttpResponse | null);
       if (calendarRes && calendarRes.ok) {
         const calData = await calendarRes.json() as {
           success: boolean;
