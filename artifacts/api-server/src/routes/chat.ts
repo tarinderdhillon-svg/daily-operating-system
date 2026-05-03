@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ProcessChatBody } from "@workspace/api-zod";
+type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
+
 
 const router = Router();
 
@@ -55,7 +57,7 @@ async function notionRequest<T = unknown>(path: string, method = "GET", body?: o
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }) as HttpResponse;
   const json = (await httpRes.json()) as T;
   if (!httpRes.ok) throw new Error(`Notion error ${httpRes.status}: ${JSON.stringify(json)}`);
   return json;

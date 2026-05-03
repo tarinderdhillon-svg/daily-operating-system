@@ -2,6 +2,8 @@ import { Router } from "express";
 import OpenAI from "openai";
 import { logger } from "../lib/logger";
 import curriculumData from "../data/curriculum.json" assert { type: "json" };
+type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
+
 
 const router = Router();
 
@@ -73,7 +75,7 @@ async function notionRequest<T = unknown>(path: string, method = "GET", body?: o
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }) as HttpResponse;
   const json = (await httpRes.json()) as T;
   if (!httpRes.ok) throw new Error(`Notion ${httpRes.status}: ${JSON.stringify(json)}`);
   return json;
@@ -197,7 +199,7 @@ async function fetchYouTubeVideo(conceptSlug: string, conceptName: string): Prom
         maxResults:        "5",
         part:              "snippet",
       });
-      const httpRes = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+      const httpRes = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`) as { json(): Promise<unknown>; ok: boolean; status: number };
       if (httpRes.ok) {
         const data = await httpRes.json() as {
           items?: Array<{ id: { videoId?: string }; snippet: { title: string; channelTitle: string } }>

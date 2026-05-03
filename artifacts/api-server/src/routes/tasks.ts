@@ -7,6 +7,8 @@ import {
   DeleteTaskParams,
 } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
+
 
 const router = Router();
 
@@ -49,7 +51,7 @@ async function notionRequest<T = unknown>(path: string, method = "GET", body?: o
       "Content-Type": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }) as HttpResponse;
   const json = (await httpRes.json()) as T;
   if (!httpRes.ok) throw new Error(`Notion API error ${httpRes.status}: ${JSON.stringify(json)}`);
   return json;
