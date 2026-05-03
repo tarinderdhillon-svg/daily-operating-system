@@ -1,7 +1,7 @@
 import { Router } from "express";
-import OpenAI from "openai";
+import { OpenAI } from "openai";
 import { logger } from "../lib/logger";
-import curriculumData from "../data/curriculum.json" assert { type: "json" };
+import curriculumData from "../data/curriculum.json" with { type: "json" };
 type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
 
 
