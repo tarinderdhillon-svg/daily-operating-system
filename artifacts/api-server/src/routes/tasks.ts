@@ -1,12 +1,6 @@
 import { Router } from "express";
-import {
-  GetTasksResponse,
-  CreateTaskBody,
-  UpdateTaskBody,
-  UpdateTaskParams,
-  DeleteTaskParams,
-} from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+
 type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
 
 
@@ -106,14 +100,12 @@ router.get("/", async (req, res): Promise<void> => {
       todo.push(task);
     }
 
-    res.json(
-      GetTasksResponse.parse({
-        success: true,
-        tasks: activeTasks,
-        categorized: { overdue, outstanding, inProgress, todo },
-        completed,
-      }),
-    );
+    res.json({
+      success: true,
+      tasks: activeTasks,
+      categorized: { overdue, outstanding, inProgress, todo },
+      completed,
+    });
   } catch (err) {
     req.log.error({ err }, "Failed to fetch tasks");
     res.status(500).json({ success: false, error: "Failed to fetch tasks" });
@@ -121,14 +113,13 @@ router.get("/", async (req, res): Promise<void> => {
 });
 
 router.post("/", async (req, res): Promise<void> => {
-  const parsed = CreateTaskBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ success: false, error: parsed.error.message });
+  const { title, due_date, priority, status, notes } = req.body;
+  const project_id = req.body.project_id as string | undefined;
+
+  if (typeof title !== "string" || !title.trim()) {
+    res.status(400).json({ success: false, error: "Title is required" });
     return;
   }
-
-  const { title, due_date, priority, status, notes } = parsed.data;
-  const project_id = req.body.project_id as string | undefined;
 
   try {
     const properties: Record<string, unknown> = {
@@ -154,20 +145,13 @@ router.post("/", async (req, res): Promise<void> => {
 });
 
 router.patch("/:taskId", async (req, res): Promise<void> => {
-  const paramsParsed = UpdateTaskParams.safeParse(req.params);
-  if (!paramsParsed.success) {
+  const { taskId } = req.params;
+  if (typeof taskId !== "string" || !taskId.trim()) {
     res.status(400).json({ success: false, error: "Invalid task ID", message: "Invalid task ID" });
     return;
   }
 
-  const bodyParsed = UpdateTaskBody.safeParse(req.body);
-  if (!bodyParsed.success) {
-    res.status(400).json({ success: false, error: bodyParsed.error.message, message: bodyParsed.error.message });
-    return;
-  }
-
-  const { taskId } = paramsParsed.data;
-  const { title, status, priority, due_date, notes } = bodyParsed.data;
+  const { title, status, priority, due_date, notes } = req.body;
   const project_id = req.body.project_id as string | null | undefined;
 
   try {
@@ -176,7 +160,7 @@ router.patch("/:taskId", async (req, res): Promise<void> => {
     if (status   != null) properties["Status"]   = { status: { name: status } };
     if (priority != null) properties["Priority"] = { select: { name: priority } };
     if (due_date != null) properties["Due Date"] = { date: { start: due_date } };
-    else if (due_date === null && "due_date" in bodyParsed.data) properties["Due Date"] = { date: null };
+    else if (due_date === null && "due_date" in req.body) properties["Due Date"] = { date: null };
     if (notes    != null) properties["Notes"]    = { rich_text: [{ text: { content: notes } }] };
     if (project_id !== undefined) {
       properties["Related Project"] = project_id
@@ -193,13 +177,11 @@ router.patch("/:taskId", async (req, res): Promise<void> => {
 });
 
 router.delete("/:taskId", async (req, res): Promise<void> => {
-  const paramsParsed = DeleteTaskParams.safeParse(req.params);
-  if (!paramsParsed.success) {
+  const { taskId } = req.params;
+  if (typeof taskId !== "string" || !taskId.trim()) {
     res.status(400).json({ success: false, error: "Invalid task ID", message: "Invalid task ID" });
     return;
   }
-
-  const { taskId } = paramsParsed.data;
   try {
     await notionRequest(`/pages/${taskId}`, "PATCH", { archived: true });
     res.json({ success: true, message: "Task deleted successfully" });

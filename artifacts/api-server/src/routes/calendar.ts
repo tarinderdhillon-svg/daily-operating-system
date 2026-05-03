@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { GetCalendarResponse } from "@workspace/api-zod";
 import {
   getCalendarView,
   formatEventTime,
@@ -58,18 +57,18 @@ router.get("/", async (req, res): Promise<void> => {
 
     req.log.info({ todayCount: todayEvents.length, tomorrowCount: tomorrowEvents.length }, "Outlook calendar fetched");
 
-    res.json(GetCalendarResponse.parse({
+    res.json({
       success:  true,
       today:    { date: todayISO,    events: todayEvents    },
       tomorrow: { date: tomorrowISO, events: tomorrowEvents },
-    }));
+    });
   } catch (err) {
     req.log.warn({ err }, "Outlook Graph API error — using mock data");
-    res.json(GetCalendarResponse.parse({
+    res.json({
       success:  true,
       today:    { date: todayISO,    events: MOCK_TODAY    },
       tomorrow: { date: tomorrowISO, events: MOCK_TOMORROW },
-    }));
+    });
   }
 });
 

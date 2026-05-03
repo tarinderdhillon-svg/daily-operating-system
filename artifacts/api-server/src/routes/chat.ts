@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ProcessChatBody } from "@workspace/api-zod";
+
 type HttpResponse = { json(): Promise<unknown>; ok: boolean; status: number };
 
 
@@ -177,13 +177,11 @@ Return only the JSON object, no other text.`;
 }
 
 router.post("/", async (req, res): Promise<void> => {
-  const parsed = ProcessChatBody.safeParse(req.body);
-  if (!parsed.success) {
+  const message = req.body?.message;
+  if (typeof message !== "string" || !message.trim()) {
     res.status(400).json({ success: false, response: "Invalid request." });
     return;
   }
-
-  const { message } = parsed.data;
   const lowerMsg = message.toLowerCase();
 
   try {
