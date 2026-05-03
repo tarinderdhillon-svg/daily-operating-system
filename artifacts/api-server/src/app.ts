@@ -40,8 +40,8 @@ app.use(express.static(publicPath));
 // API routes
 app.use("/api", router);
 
-// Serve index.html for all non-API routes (for SPA routing)
-app.all("*", (req, res) => {
+// Serve index.html for all non-API, non-static routes (for SPA routing)
+app.use((req, res) => {
   const indexPath = path.join(publicPath, "index.html");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.sendFile(indexPath);
