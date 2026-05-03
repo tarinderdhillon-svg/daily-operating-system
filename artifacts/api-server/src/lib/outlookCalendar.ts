@@ -4,6 +4,8 @@
  */
 import { ReplitConnectors } from "@replit/connectors-sdk";
 
+type HttpResponse = { ok: boolean; status: number; text(): Promise<string>; json(): Promise<unknown> };
+
 export interface GraphCalendarEvent {
   id: string;
   subject: string;
@@ -39,7 +41,7 @@ export async function getCalendarView(
   const response = await connectors.proxy("outlook", endpoint, {
     method: "GET",
     headers: { Prefer: `outlook.timezone="${timeZone}"` },
-  }) as Response;
+  }) as HttpResponse;
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
