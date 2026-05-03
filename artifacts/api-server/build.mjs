@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
-import { rm } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 
 // Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
 globalThis.require = createRequire(import.meta.url);
@@ -118,6 +118,25 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  // Create a CommonJS entrypoint for Vercel (which looks for app.js, index.js, or server.js)
+  // Use dynamic import() which works in CommonJS since Node.js 18
+  const indexJsPath = path.resolve(distDir, "index.js");
+  const indexJsContent = `(async () => {
+  try {
+    const { default: app } = await import('./index.mjs');
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+      console.log(\`Server running on port \${port}\`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
+})();`;
+
+  await writeFile(indexJsPath, indexJsContent);
+  console.log("✓ Created index.js CommonJS entrypoint for Vercel");
 }
 
 buildAll().catch((err) => {
