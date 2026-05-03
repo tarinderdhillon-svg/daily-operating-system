@@ -34,7 +34,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from public directory
-const publicPath = path.join(__dirname, "public");
+const publicPath = path.join(process.cwd(), "public");
 app.use(express.static(publicPath));
 
 // API routes
