@@ -41,11 +41,14 @@ app.use(express.static(publicPath));
 // API routes
 app.use("/api", router);
 
-// Serve index.html for all non-API, non-static routes (for SPA routing)
-app.use((req, res) => {
+// Serve index.html for root path (SPA routing simplified)
+app.get("/", (req, res) => {
   const indexPath = path.join(publicPath, "index.html");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.sendFile(indexPath);
 });
+
+// Note: SPA routing for non-API paths removed temporarily to fix route pattern issue
+// Static files are served via express.static() above, which handles /script.js, /styles.css, etc.
 
 export default app;
