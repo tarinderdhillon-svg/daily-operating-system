@@ -15,7 +15,18 @@ const NOTION_API_KEY = process.env.NOTION_API_KEY || "";
 const NOTION_LEARNING_DB_ID = "33f6990a-2879-81ed-8265-c369ca896b83";
 const NOTION_VERSION = "2022-06-28";
 
-const openai = new OpenAI({ apiKey: process.env["OPENAI_API_KEY"] });
+// Lazy-load OpenAI client (only when needed, not at startup)
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    const apiKey = process.env["OPENAI_API_KEY"];
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY environment variable is not set");
+    }
+    openaiClient = new OpenAI({ apiKey });
+  }
+  return openaiClient;
+}
 
 const CATEGORY_WEIGHTS: Record<string, number> = {
   "Foundations": 0.40,
@@ -231,7 +242,7 @@ async function fetchYouTubeVideo(conceptSlug: string, conceptName: string): Prom
 
 async function generateLesson(concept: typeof curriculumData.concepts[0]): Promise<string> {
   const [completion, video] = await Promise.all([
-    openai.chat.completions.create({
+    getOpenAI().chat.completions.create({
       model: "gpt-4o",
       max_tokens: 1400,
       temperature: 0.7,
@@ -317,7 +328,7 @@ async function generateWeeklyRecap(history: NotionPage[]): Promise<string> {
     category: p.properties.Category?.select?.name ?? "Unknown",
   }));
 
-  const completion = await openai.chat.completions.create({
+  const completion = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     max_tokens: 1200,
     temperature: 0.7,

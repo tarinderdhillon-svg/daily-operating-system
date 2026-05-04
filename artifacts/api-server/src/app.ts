@@ -34,7 +34,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from public directory
-const publicPath = path.join(process.cwd(), "public");
+// In Vercel, files are bundled to dist/public, so we need to look there
+const publicPath = path.join(process.cwd(), "dist", "public");
 app.use(express.static(publicPath));
 
 // API routes
