@@ -3,9 +3,9 @@
 
 const path = require('path');
 
-// In Vercel, the working directory is the project root
+// In Vercel serverless, use process.cwd() which points to the deployment root
 // The built app is at artifacts/api-server/dist/index.js
-const appPath = path.join(__dirname, '..', 'artifacts', 'api-server', 'dist', 'index.js');
+const appPath = path.join(process.cwd(), 'artifacts', 'api-server', 'dist', 'index.js');
 const app = require(appPath).default;
 
 module.exports = app;
