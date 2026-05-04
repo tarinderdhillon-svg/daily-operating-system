@@ -113,6 +113,11 @@ async function buildAll() {
   const publicDir = path.resolve(artifactDir, "public");
   const publicDistDir = path.resolve(distDir, "public");
   await cp(publicDir, publicDistDir, { recursive: true });
+
+  // Copy data directory for learning curriculum
+  const dataDir = path.resolve(artifactDir, "src/data");
+  const dataDistDir = path.resolve(distDir, "data");
+  await cp(dataDir, dataDistDir, { recursive: true });
 }
 
 buildAll().catch((err) => {
