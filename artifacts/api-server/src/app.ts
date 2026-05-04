@@ -46,6 +46,12 @@ app.use(express.static(publicPath, {
 // API routes
 app.use("/api", router);
 
+// Serve index.html for root path (SPA fallback)
+app.get("/", (_req, res) => {
+  const indexPath = path.join(publicPath, "index.html");
+  res.sendFile(indexPath);
+});
+
 // Note: SPA routing removed to fix Express v5 path-to-regexp errors
 // Static files are served via express.static() above, which handles /script.js, /styles.css, /index.html, etc.
 
