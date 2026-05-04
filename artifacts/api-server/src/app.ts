@@ -36,8 +36,12 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from public directory
 // Use __dirname for reliable path in serverless environments
 // After esbuild, the structure is: dist/index.js and dist/public/
-const publicPath = path.join(__dirname, "public");
-app.use(express.static(publicPath));
+const publicPath = path.join(__dirname || process.cwd(), "public");
+logger.info({ publicPath }, "Serving static files from:");
+app.use(express.static(publicPath, {
+  maxAge: '1h',
+  redirect: false
+}));
 
 // API routes
 app.use("/api", router);
