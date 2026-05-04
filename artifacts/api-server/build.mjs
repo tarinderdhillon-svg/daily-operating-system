@@ -114,10 +114,15 @@ async function buildAll() {
   const publicDistDir = path.resolve(distDir, "public");
   await cp(publicDir, publicDistDir, { recursive: true });
 
-  // Copy data directory for learning curriculum
-  const dataDir = path.resolve(artifactDir, "src/data");
-  const dataDistDir = path.resolve(distDir, "data");
-  await cp(dataDir, dataDistDir, { recursive: true });
+  // Optionally copy data directory if it exists (curriculum.json is bundled by esbuild)
+  try {
+    const dataDir = path.resolve(artifactDir, "src/data");
+    const dataDistDir = path.resolve(distDir, "data");
+    await cp(dataDir, dataDistDir, { recursive: true });
+  } catch (err) {
+    // Data directory is optional - curriculum.json is already bundled in the main index.js
+    console.warn("Warning: data directory copy skipped (not a critical issue)");
+  }
 }
 
 buildAll().catch((err) => {
