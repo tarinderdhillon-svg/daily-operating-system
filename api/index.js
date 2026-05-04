@@ -4,18 +4,33 @@
 const fs = require('fs');
 const path = require('path');
 
-// Construct the path to the built app
-// In Vercel, __dirname is /var/task/api and we need to go up to /var/task
-const appDir = path.dirname(path.dirname(__dirname));
-const appPath = path.join(appDir, 'artifacts', 'api-server', 'dist', 'index.js');
+try {
+  // Construct the path to the built app
+  const appDir = path.dirname(path.dirname(__dirname));
+  const appPath = path.join(appDir, 'artifacts', 'api-server', 'dist', 'index.js');
 
-// Log for debugging
-console.log('[Handler] __dirname:', __dirname);
-console.log('[Handler] appDir:', appDir);
-console.log('[Handler] appPath:', appPath);
-console.log('[Handler] File exists:', fs.existsSync(appPath));
+  // Check if file exists
+  if (!fs.existsSync(appPath)) {
+    throw new Error(`App file not found at: ${appPath}`);
+  }
 
-// Require the app
-const app = require(appPath).default;
+  // Require the app
+  const app = require(appPath).default;
 
-module.exports = app;
+  if (!app) {
+    throw new Error('App module has no default export');
+  }
+
+  module.exports = app;
+} catch (err) {
+  // If we can't load the app, export a fallback handler
+  console.error('Failed to load app:', err.message);
+
+  module.exports = (req, res) => {
+    res.status(500).json({
+      error: 'Failed to initialize app',
+      message: err.message,
+      details: err.stack
+    });
+  };
+}
