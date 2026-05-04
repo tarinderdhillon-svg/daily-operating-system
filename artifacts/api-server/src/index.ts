@@ -3,37 +3,44 @@ import { logger } from "./lib/logger";
 import cron from "node-cron";
 import { getLearningHistory, selectNextConcept, generateLesson, saveToNotion } from "./routes/learning";
 
-const rawPort = process.env["PORT"] ?? "3000";
-const port = Number(rawPort);
+// Export app for Vercel serverless
+export default app;
 
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+// Initialize scheduler
+cron.schedule(
+  "30 5 * * *",
+  async () => {
+    logger.info("⏰ Daily learning scheduler triggered (5:30 AM UK time)");
+    try {
+      const history = await getLearningHistory();
+      const concept = selectNextConcept(history);
+      const lesson = await generateLesson(concept);
+      await saveToNotion(concept, lesson, false);
+      logger.info({ concept: concept.name }, "✅ Daily lesson auto-generated and saved to Notion");
+    } catch (err) {
+      logger.error({ err }, "❌ Daily learning scheduler failed");
+    }
+  },
+  { timezone: "Europe/London" }
+);
 
-app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
+logger.info("📅 Daily learning scheduler registered — fires at 5:30 AM UK time");
+
+// Only listen on port if running locally (not in Vercel serverless)
+if (process.env.NODE_ENV !== "production") {
+  const rawPort = process.env["PORT"] ?? "3000";
+  const port = Number(rawPort);
+
+  if (Number.isNaN(port) || port <= 0) {
+    throw new Error(`Invalid PORT value: "${rawPort}"`);
   }
 
-  logger.info({ port }, "Server listening");
+  app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
 
-  cron.schedule(
-    "30 5 * * *",
-    async () => {
-      logger.info("⏰ Daily learning scheduler triggered (5:30 AM UK time)");
-      try {
-        const history = await getLearningHistory();
-        const concept = selectNextConcept(history);
-        const lesson = await generateLesson(concept);
-        await saveToNotion(concept, lesson, false);
-        logger.info({ concept: concept.name }, "✅ Daily lesson auto-generated and saved to Notion");
-      } catch (err) {
-        logger.error({ err }, "❌ Daily learning scheduler failed");
-      }
-    },
-    { timezone: "Europe/London" }
-  );
-
-  logger.info("📅 Daily learning scheduler registered — fires at 5:30 AM UK time");
-});
+    logger.info({ port }, "Server listening");
+  });
+}
