@@ -34,8 +34,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from public directory
-// In Vercel, files are bundled to dist/public, so we need to look there
-const publicPath = path.join(process.cwd(), "dist", "public");
+// Use __dirname for reliable path in serverless environments
+// After esbuild, the structure is: dist/index.js and dist/public/
+const publicPath = path.join(__dirname, "public");
 app.use(express.static(publicPath));
 
 // API routes
