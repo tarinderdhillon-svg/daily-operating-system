@@ -1,10 +1,11 @@
 // Vercel serverless handler for Express app
-// Test handler to diagnose deployment issue
+// This file is automatically detected by Vercel as a serverless function handler.
+// It loads the compiled Express app from the build output and re-exports it.
 
-module.exports = (req, res) => {
-  res.status(200).json({
-    message: 'Handler is working!',
-    timestamp: new Date().toISOString(),
-    path: req.url
-  });
-};
+const path = require('path');
+
+// After build, this file is at /api/index.js and the app is at /artifacts/api-server/dist/index.js
+// __dirname here is the /api directory on the deployed container
+const app = require(path.join(__dirname, '..', 'artifacts', 'api-server', 'dist', 'index.js')).default;
+
+module.exports = app;
