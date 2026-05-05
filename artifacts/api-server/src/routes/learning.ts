@@ -384,6 +384,45 @@ router.get("/concept", async (req, res): Promise<void> => {
   }
 });
 
+// Force-regenerate today's lesson, bypassing the Notion cache
+router.post("/refresh", async (req, res): Promise<void> => {
+  try {
+    const history = await getLearningHistory();
+    const concept = selectNextConcept(history);
+    const lesson  = await generateLesson(concept);
+
+    // If a lesson already exists for today, update it; otherwise create a new one
+    const today = new Date().toISOString().split("T")[0]!;
+    const data  = await notionRequest<{ results: NotionPage[] }>(
+      `/databases/${NOTION_LEARNING_DB_ID}/query`, "POST", {
+        page_size: 5,
+        filter: { property: "Date", date: { equals: today } },
+      }
+    );
+    const existing = data.results.find(p => !p.properties["Is Recap"]?.checkbox);
+
+    if (existing) {
+      await notionRequest(`/pages/${existing.id}`, "PATCH", {
+        properties: {
+          Name:       { title: [{ text: { content: concept.name } }] },
+          Category:   { select: { name: concept.category } },
+          Difficulty: { select: { name: concept.difficulty } },
+          Lesson:     { rich_text: chunkText(lesson) },
+          Status:     { select: { name: "New" } },
+        },
+      });
+    } else {
+      await saveToNotion(concept, lesson, false);
+    }
+
+    logger.info({ concept: concept.name }, "Learning lesson force-refreshed");
+    res.json({ lesson, cached: false, concept: concept.name, category: concept.category });
+  } catch (err) {
+    logger.error({ err }, "Failed to refresh learning concept");
+    res.status(500).json({ error: "Failed to refresh lesson" });
+  }
+});
+
 router.get("/recap", async (req, res): Promise<void> => {
   try {
     const history = await getLearningHistory();

@@ -1,10 +1,14 @@
 /**
- * Microsoft Outlook Calendar via Replit Connectors SDK + Microsoft Graph.
- * Uses @replit/connectors-sdk — tokens are refreshed automatically.
+ * Microsoft Outlook Calendar via direct Microsoft Graph API.
+ * Auth: refresh-token flow — exchange MICROSOFT_REFRESH_TOKEN for a short-lived
+ * access token on each request.
+ *
+ * Required Vercel env vars:
+ *   MICROSOFT_CLIENT_ID     — Azure AD app registration client ID
+ *   MICROSOFT_CLIENT_SECRET — Azure AD app registration secret
+ *   MICROSOFT_REFRESH_TOKEN — long-lived refresh token (personal account or work/school)
+ *   MICROSOFT_TENANT_ID     — tenant ID or "common" / "consumers" (default: "common")
  */
-import { ReplitConnectors } from "@replit/connectors-sdk";
-
-type HttpResponse = { ok: boolean; status: number; text(): Promise<string>; json(): Promise<unknown> };
 
 export interface GraphCalendarEvent {
   id: string;
@@ -16,17 +20,55 @@ export interface GraphCalendarEvent {
   isCancelled?: boolean;
 }
 
+async function getAccessToken(): Promise<string> {
+  const clientId     = process.env.MICROSOFT_CLIENT_ID;
+  const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+  const refreshToken = process.env.MICROSOFT_REFRESH_TOKEN;
+  const tenantId     = process.env.MICROSOFT_TENANT_ID ?? "common";
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error(
+      "Microsoft Graph credentials not configured. " +
+      "Set MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_REFRESH_TOKEN in Vercel env vars."
+    );
+  }
+
+  const body = new URLSearchParams({
+    grant_type:    "refresh_token",
+    client_id:     clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    scope:         "https://graph.microsoft.com/Calendars.Read offline_access",
+  });
+
+  const res = await fetch(
+    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+    {
+      method:  "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`Microsoft token refresh failed (${res.status}): ${err}`);
+  }
+
+  const data = (await res.json()) as { access_token: string };
+  return data.access_token;
+}
+
 /**
- * Fetch calendar events for a date range from Microsoft Graph via the Replit proxy.
- * startDateTime / endDateTime should be ISO strings like "2026-04-11T00:00:00"
+ * Fetch calendar events for a date range from Microsoft Graph.
+ * startDateTime / endDateTime: ISO strings like "2026-04-11T00:00:00"
  */
 export async function getCalendarView(
   startDateTime: string,
   endDateTime:   string,
   timeZone = "Europe/London",
 ): Promise<GraphCalendarEvent[]> {
-  // Create a fresh client per call — tokens may expire
-  const connectors = new ReplitConnectors();
+  const accessToken = await getAccessToken();
 
   const params = new URLSearchParams({
     startDateTime,
@@ -36,19 +78,22 @@ export async function getCalendarView(
     "$top":     "50",
   });
 
-  const endpoint = `/v1.0/me/calendarView?${params}`;
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0/me/calendarView?${params}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Prefer:        `outlook.timezone="${timeZone}"`,
+      },
+    }
+  );
 
-  const response = await connectors.proxy("outlook", endpoint, {
-    method: "GET",
-    headers: { Prefer: `outlook.timezone="${timeZone}"` },
-  }) as HttpResponse;
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Microsoft Graph error ${response.status}: ${body}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Microsoft Graph error ${res.status}: ${body}`);
   }
 
-  const data = (await response.json()) as { value: GraphCalendarEvent[] };
+  const data = (await res.json()) as { value: GraphCalendarEvent[] };
   return (data.value ?? []).filter((e) => !e.isCancelled);
 }
 

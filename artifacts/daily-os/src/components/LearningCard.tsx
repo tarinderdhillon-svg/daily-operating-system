@@ -201,6 +201,33 @@ export function LearningCard() {
     }
   }
 
+  async function forceRefresh() {
+    stopSpeaking();
+    setIsLoading(true);
+    setLoadingType("concept");
+    setError(null);
+    setAnswerSaved(false);
+    setAnswer("");
+
+    try {
+      const res  = await fetch(`${baseUrl}/api/learning/refresh`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to refresh");
+      setLesson({
+        text:     data.lesson,
+        concept:  data.concept,
+        category: data.category,
+        cached:   false,
+      });
+      setExpanded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsLoading(false);
+      setLoadingType(null);
+    }
+  }
+
   async function saveAnswer() {
     if (!answer.trim()) return;
     setIsSavingAnswer(true);
@@ -405,7 +432,7 @@ export function LearningCard() {
                 <p className="text-[10px] text-slate-700 font-mono mt-4 flex items-center gap-1.5">
                   Loaded from today's Notion entry ·
                   <button
-                    onClick={() => fetchConcept("concept")}
+                    onClick={forceRefresh}
                     className="text-indigo-600 hover:text-indigo-400 transition-colors flex items-center gap-1"
                   >
                     <RefreshCw className="h-2.5 w-2.5" />
