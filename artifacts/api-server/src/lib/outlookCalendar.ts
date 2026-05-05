@@ -10,6 +10,14 @@
  *   MICROSOFT_TENANT_ID     — tenant ID or "common" / "consumers" (default: "common")
  */
 
+// Node's fetch returns a narrower type — use this local alias to match the api pattern
+type HttpResponse = {
+  ok:     boolean;
+  status: number;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+};
+
 export interface GraphCalendarEvent {
   id: string;
   subject: string;
@@ -48,7 +56,7 @@ async function getAccessToken(): Promise<string> {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
     }
-  );
+  ) as unknown as HttpResponse;
 
   if (!res.ok) {
     const err = await res.text().catch(() => "");
@@ -86,7 +94,7 @@ export async function getCalendarView(
         Prefer:        `outlook.timezone="${timeZone}"`,
       },
     }
-  );
+  ) as unknown as HttpResponse;
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
