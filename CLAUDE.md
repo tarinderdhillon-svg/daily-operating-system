@@ -31,9 +31,16 @@ pnpm --filter @workspace/api-server run dev
 cd artifacts/daily-os && pnpm run dev
 ```
 
-The workflow:
+**Build Workflow**:
 1. Vite bundles React app to root `/public` directory with code splitting (vendor-react, vendor-query, vendor-icons, vendor-date chunks)
-2. esbuild then bundles Express app with TypeScript → CommonJS, externalises native/cloud packages, runs pino's transport plugin
+2. esbuild bundles Express app: TypeScript → CommonJS, externalises native/cloud packages, runs pino's transport plugin
+3. Build output copied to `artifacts/api-server/dist/` for Vercel deployment
+
+**Local Build Issues**:
+If you get errors about missing native modules (`@rollup/rollup-darwin-arm64`, `lightningcss`, etc.) during local builds:
+- These are optional dependencies for Vite/Rollup
+- Run `rm -rf node_modules pnpm-lock.yaml && pnpm install` to reinstall with proper native module detection
+- Vercel's build environment handles these automatically, so local build failures don't block deployment
 
 ## Architecture
 
@@ -130,9 +137,21 @@ const app = require('../artifacts/api-server/dist/index.js').default;
 module.exports = app;
 ```
 
-### SPA Fallback in Express
+### Current Frontend Status
 
-`app.ts` uses `app.all('*')` catch-all handler to serve `index.html` for non-API routes. This allows React Router to handle all URL navigation client-side.
+**IMPORTANT**: The React frontend (`artifacts/daily-os/`) is not currently deployed. The app uses the vanilla JS frontend in `artifacts/api-server/public/` instead.
+
+**Why**: Deploying a React SPA through a Vercel serverless function (at `/api/index.js`) creates an architectural mismatch:
+- Serving static files from a serverless function causes bundling/path issues
+- Vercel's static asset handler and function routing don't cleanly separate for SPA + API patterns
+- Previous attempts to integrate the React frontend caused function crashes
+
+**Future Solution**: To activate the React frontend, either:
+1. Host React on Netlify/Vercel static hosting + API separately
+2. Switch to a platform like Railway/Render with full-stack support
+3. Use Next.js to combine API and frontend in one codebase
+
+For now, `app.ts` only mounts `/api` routes and falls back to serving static files. The React app exists and is buildable (`pnpm --filter @workspace/daily-os run build`) but is not included in Vercel deployments.
 
 ## Environment Variables
 
@@ -152,24 +171,28 @@ Required in Vercel dashboard (not committed):
 
 ## Known Deployment Issues
 
-### Static Assets Bundling
+### SPA + Serverless Function Architectural Mismatch
 
-**Problem**: Vercel's function bundler was transforming static JS files (converting ESM to CommonJS), causing `ReferenceError: require is not defined` in the browser.
+**The Core Issue**: Serving a React SPA through a Vercel serverless function creates fundamental problems:
 
-**Solution**: Use `vercel.json` rewrites to route static file requests directly to `/public` without going through the Express function. Express only handles `/api` routes and serves `index.html` as a fallback for SPA routing.
+1. **Static File Serving**: Vercel's static handler and function routing don't cleanly separate when both are needed
+2. **Module Bundling**: Files served through the function get transformed by Vercel's bundler (ESM → CommonJS), breaking browser code
+3. **Path Resolution**: Distinguishing between "should be a static file" vs "should route to function" is ambiguous
+
+**Current Workaround**: The React frontend (`artifacts/daily-os/`) is *not* deployed. Instead, the vanilla JS frontend in `artifacts/api-server/public/` is used.
 
 ### FUNCTION_INVOCATION_FAILED
 
-Appears when the serverless function crashes before handling a request. Root causes:
+Appears when the serverless function crashes. Root causes:
 
-1. **Path resolution failure** — `api/index.js` cannot `require()` the compiled app. Always use `__dirname`-relative paths.
-2. **Module crash on load** — compiled app throws during module init (missing env var, Express v5 route parse error).
-3. **Rewrites misconfiguration** — destination must be a valid route (`/api` or a file path, not an invalid path).
+1. **Path resolution failure** — `api/index.js` cannot `require()` the compiled app. Always use `__dirname`-relative paths
+2. **Module crash on load** — compiled app throws during module init (missing env var, Express v5 route parse error)
+3. **Rewrites misconfiguration** — `vercel.json` destination must be valid
 
 **Debugging steps**:
 1. Check runtime logs: Vercel dashboard → Deployment → Logs
-2. If no runtime logs, crash is at module load time
-3. Test locally: `node -e "require('./api/index.js')"` — should print no errors
+2. If no runtime logs, crash is at module load time (check build logs instead)
+3. Test locally: `node -e "require('./api/index.js')"` should have no errors
 4. Test compiled app: `node dist/index.js` from `artifacts/api-server/`
 
 ## Workspace Layout
