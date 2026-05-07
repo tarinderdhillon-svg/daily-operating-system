@@ -1,13 +1,10 @@
 {
   "buildCommand": "pnpm --filter @workspace/daily-os run build && pnpm --filter @workspace/api-server run build",
+  "public": "public",
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
     }
   ]
 }
