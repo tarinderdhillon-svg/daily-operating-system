@@ -37,8 +37,9 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    // Output directly into api-server/public so esbuild copies it to dist/public
-    outDir: path.resolve(import.meta.dirname, "../api-server/public"),
+    // Output to root public/ directory for Vercel's static serving
+    // Vercel will serve /public/* as static assets without bundling
+    outDir: path.resolve(import.meta.dirname, "../../public"),
     emptyOutDir: true,
     // Chunk splitting — mobile gets smaller initial JS, loads rest in parallel
     rollupOptions: {
