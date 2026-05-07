@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import path from "path";
 import "./types"; // Type augmentation for pino-http
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -32,10 +33,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API routes only
-// Vercel's rewrites in vercel.json handle:
-// - /api/* → this function
-// - Everything else (/, /index.html, /assets/*, etc.) → /index.html from /public directory
+// Serve static files from public directory
+// __dirname is dist/ after build, so public is at dist/public
+const publicPath = path.join(__dirname, "public");
+app.use(express.static(publicPath, {
+  maxAge: "1d",
+  etag: false,
+}));
+
+// API routes
 app.use("/api", router);
+
+// SPA fallback: serve index.html for non-API routes
+// This handles client-side routing
+app.get("*", (req, res) => {
+  res.sendFile(path.join(publicPath, "index.html"));
+});
 
 export default app;
